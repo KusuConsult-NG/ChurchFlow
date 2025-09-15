@@ -1,0 +1,666 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CHURCHFLOW – Full Clickable  (All Screens + Auth)</title>
+  <style>
+    :root{
+      --primary:#0E4DA4; --primary-700:#0B3F86; --accent:#FFD60A;
+      --bg:#F8FAFC; --surface:#FFFFFF; --text:#1F2937; --muted:#6B7280; --line:#E5E7EB;
+      --success:#16A34A; --warning:#EAB308; --danger:#DC2626;
+      --radius-card:12px; --radius-input:10px;
+      --shadow-card:0 2px 8px rgba(0,0,0,.06); --shadow-pop:0 8px 24px rgba(0,0,0,.12);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);background:var(--bg)}
+    a{color:var(--primary);text-decoration:none}
+    .btn{display:inline-flex;gap:.5rem;align-items:center;border-radius:var(--radius-input);padding:.75rem 1rem;font-weight:600;border:1px solid transparent;cursor:pointer;transition:.2s}
+    .btn.primary{background:var(--primary);color:#fff}.btn.primary:hover{background:var(--primary-700)}
+    .btn.secondary{background:transparent;color:var(--primary);border-color:var(--primary)}
+    .btn.ghost{background:transparent;color:var(--text);border-color:var(--line)}
+    .btn.block{width:100%;justify-content:center}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-card);box-shadow:var(--shadow-card)}
+    .container{width:min(1200px,100%);margin:0 auto;padding:1rem}
+    .topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;background:var(--surface);border-bottom:1px solid var(--line)}
+    .badge{display:inline-flex;align-items:center;gap:.5rem;padding:.125rem .5rem;border-radius:999px;border:1px solid var(--line);background:#fff}
+    .layout{display:grid;grid-template-columns:264px 1fr;min-height:calc(100vh - 56px)}
+    .sidebar{background:#0C2C5C;color:#EAF2FF;padding:1rem;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto}
+    .nav{margin-top:1rem;display:flex;flex-direction:column;gap:.25rem}
+    .nav a{color:#EAF2FF;padding:.625rem .75rem;border-radius:10px;display:flex;gap:.5rem}
+    .nav a.active,.nav a:hover{background:rgba(255,255,255,.1)}
+    .content{padding:1rem}
+    .grid{display:grid;gap:1rem}
+    .grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .row{display:grid;gap:.75rem;grid-template-columns:1fr 1fr}
+    label{font-size:14px;color:var(--muted)}
+    input,select,textarea{width:100%;padding:.75rem;border-radius:var(--radius-input);border:1px solid var(--line);background:#fff;outline:none}
+    input:focus,select:focus,textarea:focus{box-shadow:0 0 0 2px rgba(14,77,164,.2);border-color:var(--primary)}
+    .section-title{display:flex;align-items:center;justify-content:space-between;margin:.25rem 0 1rem}
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:.75rem;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
+    .status{padding:.25rem .5rem;border-radius:999px;font-size:12px;border:1px solid var(--line)}
+    .status.pending{background:#FFF8E1;border-color:#FDE68A}
+    .status.approved{background:#ECFDF5;border-color:#A7F3D0}
+    .status.rejected{background:#FEF2F2;border-color:#FCA5A5}
+    .chart{height:280px;display:flex;align-items:end;gap:12px;padding:1rem}
+    .bar{width:40px;background:linear-gradient(180deg,#3B82F6,#0E4DA4);border-radius:8px 8px 0 0}
+    .hide{display:none!important}
+    .hero{display:grid;place-items:center;min-height:calc(100vh - 56px);padding:2rem;text-align:center}
+    .auth{max-width:480px;margin:2rem auto;padding:1.25rem}
+    .auth h2{margin:.25rem 0 1rem}
+    .toast{position:fixed;right:1rem;bottom:4.5rem;background:#111827;color:#fff;padding:.5rem .75rem;border-radius:8px;opacity:0;transform:translateY(8px);transition:.2s}
+    .toast.show{opacity:1;transform:translateY(0)}
+
+    /* Mobile */
+    @media (max-width:900px){
+      .layout{grid-template-columns:1fr}
+      .sidebar{position:fixed;left:0;right:0;top:56px;height:calc(100vh - 56px);transform:translateX(-100%);transition:.25s}
+      .sidebar.open{transform:translateX(0)}
+      .content{padding:.75rem}
+      .grid.cols-3,.grid.cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .row{grid-template-columns:1fr}
+      .bottomnav{display:flex}
+    }
+    .bottomnav{display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:.25rem;gap:.25rem;z-index:20}
+    .bottomnav a{flex:1;text-align:center;padding:.5rem;color:var(--muted);font-size:12px}
+    .bottomnav a.active{color:var(--primary);font-weight:600}
+  
+/* Sticky sidebar logo */
+.sidebar-logo {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  background: #0C2C5C;      /* same as sidebar */
+  padding: 8px 0 12px;
+}
+
+
+@media (max-width: 900px) {
+  .sidebar-logo img {
+    max-width: 140px !important;
+    max-height: 100px !important;
+  }
+}
+
+
+/* removed theme appearance blocks *//
+:root { color-scheme: light dark; }
+/* Force Light */
+html.theme-light body { background: #F8FAFC; color: #1F2937; }
+html.theme-light .topbar { background: #FFFFFF; border-bottom: 1px solid #E5E7EB; }
+html.theme-light .sidebar { background: #0C2C5C; color: #EAF2FF; }
+html.theme-light .sidebar .badge { background: #0b3f86; border-color: rgba(255,255,255,.2); }
+html.theme-light .sidebar a { color: #EAF2FF; }
+html.theme-light .sidebar a:hover { background: rgba(255,255,255,.08); }
+html.theme-light .sidebar-logo { background: transparent; border-bottom: none; }
+
+/* Force Dark */
+html.theme-dark body { background: #0B1220; color: #E5E7EB; }
+html.theme-dark .topbar { background: #0F172A; border-bottom: 1px solid rgba(255,255,255,.06); }
+html.theme-dark .card { background: #0F172A; border-color: rgba(255,255,255,.08); }
+html.theme-dark input, html.theme-dark select, html.theme-dark textarea { background:#0B1220; color:#E5E7EB; border-color: rgba(255,255,255,.12); }
+html.theme-dark .nav a { color: #e6eefc; }
+html.theme-dark .nav a.active, html.theme-dark .nav a:hover { background: rgba(255,255,255,.08); }
+html.theme-dark .sidebar { background: #0A1F44; border-right: 1px solid rgba(255,255,255,0.06); }
+html.theme-dark .sidebar .badge { background: #0d2b5f !important; border-color: rgba(255,255,255,0.18) !important; }
+html.theme-dark .sidebar-logo { background: rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.06); }
+
+
+/* Sidebar logo pinned under menu and stretched */
+.sidebar{display:flex;flex-direction:column}
+.nav{flex:1 1 auto}
+.sidebar-logo-bottom{margin-top:auto}
+.sidebar-logo-bottom img{width:100%;max-width:unset;height:auto;display:block}
+
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div style="display:flex;gap:.75rem;align-items:center">
+      <button id="menuBtn" class="btn ghost" aria-label="Toggle Menu">☰</button>
+      <div class="badge">CHURCHFLOW <span style="opacity:.6"></span></div>
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <a class="btn secondary" href="#/signup">Sign Up</a>
+      <a class="btn primary" href="#/login">Log In</a>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+<div class="badge" style="background:#0b3f86;color:#fff;border-color:rgba(255,255,255,.2)">✚ CHURCHFLOW</div>
+      <nav class="nav" id="nav">
+        <a href="#/home" data-route>🏠 Home</a>
+        <a href="#/dashboard" data-route>📊 Dashboard</a>
+        <a href="#/expenditures" data-route>🧾 Expenditures</a>
+        <a href="#/expenditures/new" data-route>➕ Raise Expenditure</a>
+        <a href="#/approvals" data-route>✅ Approvals</a>
+        <a href="#/income" data-route>💰 Income</a>
+        <a href="#/reports" data-route>📈 Reports</a>
+        <a href="#/audit" data-route>🔍 Audit Logs</a>
+        <a href="#/hr" data-route>🧑‍💼 HR Dashboard</a>
+        <a href="#/hr/staff" data-route>👥 Staff</a>
+        <a href="#/hr/payroll" data-route>🧾 Payroll</a>
+        <a href="#/hr/leave" data-route>🏖️ Leave</a>
+        <a href="#/hr/queries" data-route>📨 Queries</a>
+        <a href="#/bank" data-route>🏦 Bank</a>
+        <a href="#/executive" data-route>⭐ Executive</a>
+        <a href="#/settings" data-route>⚙️ Settings</a>
+        <a href="#/login" data-route>🔐 Login</a>
+        <a href="#/signup" data-route>📝 Sign Up</a>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <!-- AUTH + LANDING -->
+      <section id="home" class="card hero">
+        <div class="container">
+          <h1 style="font-size:2.2rem;margin:.25rem 0;">A closed-loop financial management for ECWA</h1>
+          <p class="muted">Remittances, payroll, expenditures, audit, and HR—integrated with Gowans MFB.</p>
+          <div style="margin-top:1rem;display:flex;gap:.5rem;justify-content:center">
+            <a class="btn primary" href="#/signup">Create Organization</a>
+            <a class="btn secondary" href="#/login">Log In</a>
+          </div>
+          <div style="margin-top:2rem" class="grid cols-3">
+            <div class="card" style="padding:1rem"><small class="muted">Transparency</small><h3>Audit Trails</h3><div class="muted">Every action logged</div></div>
+            <div class="card" style="padding:1rem"><small class="muted">Efficiency</small><h3>3-Step Approvals</h3><div class="muted">Raise → Review → Approve</div></div>
+            <div class="card" style="padding:1rem"><small class="muted">People</small><h3>HR & Payroll</h3><div class="muted">Self-service portal</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="login" class="container hide">
+        <div class="auth card">
+          <h2>Log In</h2>
+          <div class="row">
+            <div><label>Email*</label><input type="email" placeholder="you@church.org" /></div>
+            <div><label>Password*</label><input type="password" placeholder="••••••••" /></div>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:.5rem;justify-content:space-between;align-items:center">
+            <a href="#/reset" class="muted">Forgot password?</a>
+            <button class="btn primary" onclick="toast('Logged in'); location.hash='#/dashboard'">Log In</button>
+          </div>
+          <div style="margin-top:1rem" class="muted">No account? <a href="#/signup">Sign up</a></div>
+        </div>
+      </section>
+
+      <section id="signup" class="container hide">
+        <div class="auth card">
+          <h2>Sign Up & Create Organization</h2>
+          <div class="row">
+            <div><label>Full name*</label><input placeholder="Your name" /></div>
+            <div><label>Email*</label><input type="email" placeholder="you@church.org" /></div>
+          </div>
+          <div class="row">
+            <div><label>Password*</label><input type="password" placeholder="••••••••" /></div>
+            <div><label>Confirm password*</label><input type="password" placeholder="••••••••" /></div>
+          </div>
+          <div class="row">
+            <div><label>Organization Type*</label>
+              <select><option>LC</option><option>LCC</option><option>DCC</option><option>GCC</option><option>HQ</option><option>Agency</option><option>Bank</option></select></div>
+            <div><label>Organization Name*</label><input placeholder="ECWA LC • Tudun Wada" /></div>
+          </div>
+          <div class="row">
+            <div><label>Phone</label><input placeholder="+234 ..." /></div>
+            <div><label>Address</label><input placeholder="Address" /></div>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:.5rem;justify-content:flex-end">
+            <a class="btn ghost" href="#/home">Cancel</a>
+            <button class="btn primary" onclick="toast('Account created'); location.hash='#/dashboard'">Create</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- FULL APP SCREENS -->
+      <section id="dashboard" class="container hide">
+        <div class="section-title">
+          <h2>Dashboard</h2>
+          <div><button class="btn primary" onclick="toast('Quick Action: Raise Expenditure');location.hash='#/expenditures/new'">Raise Expenditure</button></div>
+        </div>
+        <div class="grid cols-3">
+          <div class="card" style="padding:1rem"><small class="muted">Income</small><h3>₦12.4m</h3><div class="muted">This Quarter</div></div>
+          <div class="card" style="padding:1rem"><small class="muted">Expenditure</small><h3>₦7.9m</h3><div class="muted">This Quarter</div></div>
+          <div class="card" style="padding:1rem"><small class="muted">Pending Approvals</small><h3>8</h3><div class="muted">Avg 1.2 days</div></div>
+        </div>
+        <div class="card" style="margin-top:1rem;">
+          <div style="display:flex; justify-content:space-between; padding:1rem;">
+            <strong>Income vs Expenditure</strong>
+            <select><option>Last 12 months</option><option>YTD</option></select>
+          </div>
+          <div class="chart">
+            <div class="bar" style="height:40%"></div>
+            <div class="bar" style="height:65%"></div>
+            <div class="bar" style="height:58%"></div>
+            <div class="bar" style="height:70%"></div>
+            <div class="bar" style="height:52%"></div>
+            <div class="bar" style="height:75%"></div>
+            <div class="bar" style="height:60%"></div>
+            <div class="bar" style="height:68%"></div>
+            <div class="bar" style="height:55%"></div>
+            <div class="bar" style="height:72%"></div>
+            <div class="bar" style="height:59%"></div>
+            <div class="bar" style="height:77%"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="expenditures" class="container hide">
+        <div class="section-title">
+          <h2>Expenditures</h2>
+          <div>
+            <button class="btn ghost" onclick="toast('Exporting CSV…')">Export CSV</button>
+            <a href="#/expenditures/new" class="btn primary">New</a>
+          </div>
+        </div>
+        <div class="card" style="padding:1rem;">
+          <div class="row">
+            <input placeholder="Search by purpose or ref…"/>
+            <div style="display:flex; gap:.5rem;">
+              <select><option>Status (all)</option><option>Pending</option><option>Under Review</option><option>Approved</option><option>Rejected</option></select>
+              <select><option>Last 30 days</option><option>Quarter</option><option>YTD</option></select>
+            </div>
+          </div>
+          <table class="table" style="margin-top:1rem;">
+            <thead><tr><th>Ref</th><th>Purpose</th><th>Amount</th><th>Raised By</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>EXP-0145</td><td>Roof repair</td><td>₦250,000</td><td>Grace</td><td><span class="status pending">Pending</span></td><td><a href="#/expenditures/0145">Open</a></td></tr>
+              <tr><td>EXP-0144</td><td>Youth retreat logistics</td><td>₦740,000</td><td>Kunle</td><td><span class="status approved">Approved</span></td><td><a href="#/expenditures/0144">Open</a></td></tr>
+              <tr><td>EXP-0143</td><td>Generator maintenance</td><td>₦180,000</td><td>Mary</td><td><span class="status rejected">Rejected</span></td><td><a href="#/expenditures/0143">Open</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="expenditures-new" class="container hide">
+        <div class="section-title"><h2>Raise Expenditure</h2></div>
+        <div class="card" style="padding:1rem;">
+          <div class="form">
+            <div class="row">
+              <div><label>Purpose*</label><input placeholder="e.g., Roof repair"/></div>
+              <div><label>Category*</label><select><option>Maintenance</option><option>Welfare</option><option>Admin</option></select></div>
+            </div>
+            <div class="row">
+              <div><label>Amount (₦)*</label><input type="number" placeholder="0.00"/></div>
+              <div><label>Beneficiary</label><input placeholder="Vendor/Staff name"/></div>
+            </div>
+            <div><label>Notes</label><textarea rows="3" placeholder="Add any details…"></textarea></div>
+            <div><label>Attachments</label><input type="file" multiple/></div>
+            <div style="display:flex; gap:.5rem; justify-content:flex-end;">
+              <a class="btn ghost" href="#/expenditures">Cancel</a>
+              <button class="btn primary" onclick="toast('Submitted for review'); location.hash='#/approvals'">Submit</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="approvals" class="container hide">
+        <div class="section-title"><h2>My Approvals</h2></div>
+        <div class="card" style="padding:1rem;">
+          <table class="table">
+            <thead><tr><th>Ref</th><th>Purpose</th><th>Amount</th><th>Stage</th><th>Actions</th></tr></thead>
+            <tbody>
+              <tr><td>EXP-0145</td><td>Roof repair</td><td>₦250,000</td><td>Secretary Review</td>
+                <td>
+                  <button class="btn primary" onclick="toast('Approved & forwarded')">Approve</button>
+                  <button class="btn ghost" onclick="toast('Changes requested')">Request changes</button>
+                  <button class="btn ghost" onclick="toast('Rejected')">Reject</button>
+                </td></tr>
+              <tr><td>EXP-0146</td><td>Choir microphones</td><td>₦410,000</td><td>LO Approval</td>
+                <td>
+                  <button class="btn primary" onclick="toast('Approved')">Approve</button>
+                  <button class="btn ghost" onclick="toast('Rejected')">Reject</button>
+                </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="income" class="container hide">
+        <div class="section-title"><h2>Income</h2></div>
+        <div class="card" style="padding:1rem;">
+          <div class="row">
+            <input placeholder="Search…" />
+            <div style="display:flex; gap:.5rem;">
+              <button class="btn secondary" onclick="document.getElementById('income-form').classList.toggle('hide')">Record Income</button>
+              <button class="btn ghost" onclick="toast('Reconciling with bank…')">Reconcile</button>
+            </div>
+          </div>
+          <div id="income-form" class="form hide" style="margin-top:1rem;">
+            <div class="row">
+              <div><label>Source*</label><select><option>Tithe</option><option>Offering</option><option>Transfer</option></select></div>
+              <div><label>Amount (₦)*</label><input type="number" placeholder="0.00"/></div>
+            </div>
+            <div class="row">
+              <div><label>Bank Ref</label><input placeholder="e.g., TRX-55320"/></div>
+              <div><label>Date</label><input type="date"/></div>
+            </div>
+            <div><button class="btn primary" onclick="toast('Income recorded')">Save</button></div>
+          </div>
+          <table class="table" style="margin-top:1rem;">
+            <thead><tr><th>Ref</th><th>Source</th><th>Amount</th><th>Bank Ref</th><th>Reconciled</th></tr></thead>
+            <tbody>
+              <tr><td>INC-0204</td><td>Tithe</td><td>₦1,240,000</td><td>TRX-71011</td><td>Yes</td></tr>
+              <tr><td>INC-0203</td><td>Offering</td><td>₦310,000</td><td>TRX-70331</td><td>No</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="reports" class="container hide">
+        <div class="section-title"><h2>Reports</h2><div><button class="btn ghost" onclick="toast('Exporting PDF…')">Export PDF</button></div></div>
+        <div class="grid cols-2">
+          <div class="card">
+            <div style="padding:1rem; display:flex; justify-content:space-between;"><strong>Monthly Trend</strong><select><option>12 months</option><option>YTD</option></select></div>
+            <div class="chart">
+              <div class="bar" style="height:35%"></div><div class="bar" style="height:52%"></div>
+              <div class="bar" style="height:61%"></div><div class="bar" style="height:44%"></div>
+              <div class="bar" style="height:70%"></div><div class="bar" style="height:58%"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div style="padding:1rem;"><strong>Pending Aging</strong></div>
+            <table class="table">
+              <thead><tr><th>Bucket</th><th>Count</th><th>Amount</th></tr></thead>
+              <tbody>
+                <tr><td>0-3 days</td><td>5</td><td>₦520,000</td></tr>
+                <tr><td>4-7 days</td><td>2</td><td>₦140,000</td></tr>
+                <tr><td>8+ days</td><td>1</td><td>₦250,000</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="audit" class="container hide">
+        <div class="section-title"><h2>Audit Logs</h2><div><button class="btn ghost" onclick="toast('Downloading CSV…')">Export</button></div></div>
+        <div class="card" style="padding:1rem;">
+          <div class="row">
+            <select><option>Role (all)</option><option>Fin. Secretary</option><option>Secretary</option><option>LO</option><option>Accountant</option><option>Auditor</option></select>
+            <input type="date"/>
+          </div>
+          <table class="table" style="margin-top:1rem;">
+            <thead><tr><th>Action</th><th>Actor</th><th>Entity</th><th>Ref</th><th>Timestamp</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>raised</td><td>Grace</td><td>expenditure</td><td>EXP-0145</td><td>2025-09-08 10:12</td><td>pending</td></tr>
+              <tr><td>reviewed</td><td>Mary</td><td>expenditure</td><td>EXP-0144</td><td>2025-09-08 09:02</td><td>approved</td></tr>
+              <tr><td>approved</td><td>Rev. John</td><td>expenditure</td><td>EXP-0144</td><td>2025-09-08 09:15</td><td>posted</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="hr" class="container hide">
+        <div class="section-title"><h2>HR Dashboard</h2></div>
+        <div class="grid cols-4">
+          <div class="card" style="padding:1rem"><small class="muted">Staff</small><h3>128</h3><div class="muted">Active</div></div>
+          <div class="card" style="padding:1rem"><small class="muted">Monthly Salary</small><h3>₦8.2m</h3><div class="muted">Obligation</div></div>
+          <div class="card" style="padding:1rem"><small class="muted">Open Queries</small><h3>4</h3><div class="muted">HR attention</div></div>
+          <div class="card" style="padding:1rem"><small class="muted">On Leave</small><h3>9</h3><div class="muted">Today</div></div>
+        </div>
+      </section>
+
+      <section id="hr-staff" class="container hide">
+        <div class="section-title"><h2>Staff</h2><div><button class="btn primary" onclick="document.getElementById('new-staff').classList.remove('hide')">Add Staff</button></div></div>
+        <div class="card" style="padding:1rem;">
+          <table class="table">
+            <thead><tr><th>Name</th><th>Role</th><th>Department</th><th>Start</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>Grace Ade</td><td>Accountant</td><td>Finance</td><td>2023-02-01</td><td><a href="#/hr/staff/1">Open</a></td></tr>
+              <tr><td>Kunle A.</td><td>Secretary</td><td>Admin</td><td>2024-06-12</td><td><a href="#/hr/staff/2">Open</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="new-staff" class="card hide" style="padding:1rem; margin-top:1rem;">
+          <h3>Create Staff</h3>
+          <div class="form">
+            <div class="row">
+              <div><label>First name*</label><input/></div>
+              <div><label>Last name*</label><input/></div>
+            </div>
+            <div class="row">
+              <div><label>Role*</label><input placeholder="e.g., Accountant"/></div>
+              <div><label>Department</label><input placeholder="e.g., Finance"/></div>
+            </div>
+            <div class="row">
+              <div><label>Start Date*</label><input type="date"/></div>
+              <div><label>Contract Type</label><select><option>Permanent</option><option>Temporary</option><option>Volunteer</option></select></div>
+            </div>
+            <div style="display:flex; gap:.5rem; justify-content:flex-end;">
+              <button class="btn ghost" onclick="document.getElementById('new-staff').classList.add('hide')">Cancel</button>
+              <button class="btn primary" onclick="toast('Staff saved')">Save</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="hr-payroll" class="container hide">
+        <div class="section-title"><h2>Payroll</h2><div><button class="btn primary" onclick="toast('Payroll run started')">Run Payroll</button></div></div>
+        <div class="card" style="padding:1rem;">
+          <table class="table">
+            <thead><tr><th>Period</th><th>Total Staff</th><th>Total Amount</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>2025-09</td><td>128</td><td>₦8,200,000</td><td><span class="status pending">Pending</span></td><td><a href="#">Open</a></td></tr>
+              <tr><td>2025-08</td><td>127</td><td>₦8,050,000</td><td><span class="status approved">Completed</span></td><td><a href="#">Open</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="hr-leave" class="container hide">
+        <div class="section-title"><h2>Leave Management</h2><div><button class="btn primary" onclick="document.getElementById('leave-form').classList.toggle('hide')">New Leave</button></div></div>
+        <div class="grid cols-2">
+          <div class="card" style="padding:1rem;">
+            <h3 style="margin-top:0">Requests</h3>
+            <table class="table">
+              <thead><tr><th>Staff</th><th>Type</th><th>Dates</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                <tr><td>Mary J.</td><td>Annual</td><td>Sep 10–14</td><td><span class="status pending">Pending</span></td>
+                  <td>
+                    <button class="btn primary" onclick="toast('Leave approved')">Approve</button>
+                    <button class="btn ghost" onclick="toast('Leave rejected')">Reject</button>
+                  </td></tr>
+                <tr><td>Kunle A.</td><td>Sick</td><td>Sep 9–11</td><td><span class="status approved">Approved</span></td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card" style="padding:1rem;">
+            <h3 style="margin-top:0">Calendar (lite)</h3>
+            <div class="grid cols-3">
+              <div class="card" style="padding:.5rem;"><strong>Mon</strong><div class="muted">Mary (A)</div></div>
+              <div class="card" style="padding:.5rem;"><strong>Tue</strong><div class="muted">Mary (A)</div></div>
+              <div class="card" style="padding:.5rem;"><strong>Wed</strong><div class="muted">Mary (A)</div></div>
+            </div>
+          </div>
+        </div>
+        <div id="leave-form" class="card hide" style="padding:1rem; margin-top:1rem;">
+          <h3>Request Leave</h3>
+          <div class="form">
+            <div class="row">
+              <div><label>Type*</label><select><option>Annual</option><option>Sick</option><option>Study</option></select></div>
+              <div><label>Dates*</label><input type="text" placeholder="2025-09-10 to 2025-09-14"/></div>
+            </div>
+            <div><label>Reason</label><textarea rows="3"></textarea></div>
+            <div style="display:flex; gap:.5rem; justify-content:flex-end;">
+              <button class="btn ghost" onclick="document.getElementById('leave-form').classList.add('hide')">Cancel</button>
+              <button class="btn primary" onclick="toast('Leave submitted')">Submit</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="hr-queries" class="container hide">
+        <div class="section-title"><h2>Queries & Discipline</h2><div><button class="btn primary" onclick="toast('New query issued')">Issue Query</button></div></div>
+        <div class="card" style="padding:1rem;">
+          <table class="table">
+            <thead><tr><th>Staff</th><th>Subject</th><th>Status</th><th>Last Update</th></tr></thead>
+            <tbody>
+              <tr><td>Grace Ade</td><td>Lateness</td><td><span class="status pending">Open</span></td><td>2025-09-06</td></tr>
+              <tr><td>Mary J.</td><td>Conduct</td><td><span class="status approved">Resolved</span></td><td>2025-08-28</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="bank" class="container hide">
+        <div class="section-title"><h2>Bank Operator</h2></div>
+        <div class="grid cols-3">
+          <div class="card" style="padding:1rem"><small class="muted">Inflows</small><h3>₦9.4m</h3><div class="muted">30 days</div></div>
+          <div class="card" style="padding:1rem"><small class="muted">Outflows</small><h3>₦6.8m</h3><div class="muted">30 days</div></div>
+          <div class="card" style="padding:1rem"><small class="muted">Profitability</small><h3>+₦1.1m</h3><div class="muted">Net</div></div>
+        </div>
+        <div class="card" style="padding:1rem; margin-top:1rem;">
+          <h3 style="margin-top:0">Reconciliation</h3>
+          <table class="table">
+            <thead><tr><th>Bank Ref</th><th>Entity</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td>TRX-70331</td><td>Income</td><td>₦310,000</td><td>No</td><td><button class="btn primary" onclick="toast('Reconciled')">Verify</button></td></tr>
+              <tr><td>TRX-71011</td><td>Income</td><td>₦1,240,000</td><td>Yes</td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="executive" class="container hide">
+        <div class="section-title"><h2>Executive Dashboard (GCC/DCC/HQ)</h2></div>
+        <div class="grid cols-4">
+          <div class="card" style="padding:1rem"><small class="muted">Org Units</small><h3>64</h3><div class="muted">Active</div></div>
+          <div class="card" style="padding:1rem"><small class="muted">Total Income</small><h3>₦142m</h3><div class="muted">YTD</div></div>
+          <div class="card" style="padding:1rem"><small class="muted">Total Expenditure</small><h3>₦98m</h3><div class="muted">YTD</div></div>
+          <div class="card" style="padding:1rem"><small class="muted">Pending</small><h3>37</h3><div class="muted">Approvals</div></div>
+        </div>
+      </section>
+
+      <section id="settings" class="container hide">
+        <div class="section-title"><h2>Settings</h2></div>
+        <div class="card" style="padding:1rem;">
+          <h3 style="margin-top:0">Organization & Roles</h3>
+          <div class="row">
+            <div><label>Organization</label><input value="ECWA • LC – Tudun Wada"/></div>
+            <div><label>Role</label><select><option>Financial Secretary</option><option>Secretary</option><option>LO</option><option>Accountant</option><option>Auditor</option></select></div>
+          </div>
+          <div style="margin-top:1rem; display:flex; gap:.5rem; justify-content:flex-end;">
+            <button class="btn primary" onclick="toast('Saved')">Save</button>
+          </div>
+        
+    <div class="card" style="padding:1rem; margin-top:1rem;">
+      <h3 style="margin-top:0">Appearance</h3>
+      <div class="row">
+        <div>
+          <label for="theme-select"><strong>Theme</strong></label>
+          <select id="theme-select">
+            <option value="auto">Auto (System)</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+          <div class="muted" style="margin-top:.25rem">Choose Light/Dark, or follow your device setting (Auto).</div>
+        </div>
+      </div>
+      <div style="margin-top:1rem; display:flex; gap:.5rem; justify-content:flex-end;">
+        <button class="btn primary" id="save-theme">Save Theme</button>
+      </div>
+    </div>
+    
+      </div>
+      </section>
+
+      <!-- Toast -->
+      <div id="toast" class="toast" role="status" aria-live="polite">Action completed</div>
+    </main>
+  </div>
+
+  <nav class="bottomnav" id="bottomnav">
+    <a href="#/dashboard" data-route>Home</a>
+    <a href="#/expenditures/new" data-route>Action</a>
+    <a href="#/approvals" data-route>Approvals</a>
+    <a href="#/hr" data-route>HR</a>
+    <a href="#/login" data-route>Login</a>
+  </nav>
+
+  <script>
+    const routes = {
+      "#/home":"home", "#/landing":"home",
+      "#/login":"login",
+      "#/signup":"signup",
+      "#/dashboard":"dashboard",
+      "#/expenditures":"expenditures",
+      "#/expenditures/new":"expenditures-new",
+      "#/approvals":"approvals",
+      "#/income":"income",
+      "#/reports":"reports",
+      "#/audit":"audit",
+      "#/hr":"hr",
+      "#/hr/staff":"hr-staff",
+      "#/hr/payroll":"hr-payroll",
+      "#/hr/leave":"hr-leave",
+      "#/hr/queries":"hr-queries",
+      "#/bank":"bank",
+      "#/executive":"executive",
+      "#/settings":"settings",
+      "#/welcome":"signup",
+      "#/reset":"login"
+    };
+    const navLinks=[...document.querySelectorAll('[data-route]')];
+    function render(){
+      const hash=location.hash||"#/home";
+      document.querySelectorAll('main section').forEach(el=>el.classList.add('hide'));
+      const id=routes[hash]||"landing";
+      document.getElementById(id)?.classList.remove('hide');
+      navLinks.forEach(a=>a.classList.toggle('active',a.getAttribute('href')===hash));
+      document.getElementById('sidebar').classList.remove('open');
+      const t=document.getElementById('toast');
+      t.textContent=document.querySelector('#'+id+' .section-title h2')?.textContent||document.querySelector('#'+id+' h2')?.textContent||'Loaded';
+      t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1200);
+    }
+    window.addEventListener('hashchange',render);
+    window.addEventListener('load',render);
+    document.getElementById('menuBtn').addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('open'));
+    function toast(msg){
+      const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1500);
+    }
+  </script>
+
+<script>
+(function(){
+  const KEY = 'cf_theme'; // 'auto' | 'light' | 'dark'
+
+  function applyTheme(value){
+    const html = document.documentElement;
+    html.classList.remove('theme-light','theme-dark');
+    if(value === 'light'){ html.classList.add('theme-light'); }
+    else if(value === 'dark'){ html.classList.add('theme-dark'); }
+    // 'auto' => no class (uses CSS + prefers-color-scheme)
+  }
+
+  function loadTheme(){
+    try{
+      const val = localStorage.getItem(KEY) || 'auto';
+      applyTheme(val);
+      const sel = document.getElementById('theme-select');
+      if(sel){ sel.value = val; }
+    }catch(e){}
+  }
+
+  function saveTheme(){
+    const sel = document.getElementById('theme-select');
+    if(!sel) return;
+    const val = sel.value;
+    try{ localStorage.setItem(KEY, val); }catch(e){}
+    applyTheme(val);
+    const toast = document.getElementById('toast');
+    if(toast){ toast.textContent = 'Theme updated'; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 1200); }
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    loadTheme();
+    const btn = document.getElementById('save-theme');
+    if(btn){ btn.addEventListener('click', saveTheme); }
+  });
+})();
+</script>
+
+</body>
+</html>
