@@ -1,0 +1,69 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+enum Role { ADMIN FINANCE HR VIEWER }
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  fullName  String
+  role      Role     @default(VIEWER)
+  createdAt DateTime @default(now())
+}
+
+model Member {
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String?  @unique
+  phone     String?
+  createdAt DateTime @default(now())
+}
+
+model Income {
+  id        String   @id @default(cuid())
+  source    String
+  narration String?
+  amount    Decimal  @db.Decimal(18,2)
+  date      DateTime @default(now())
+  createdBy String?
+}
+
+model Expenditure {
+  id        String   @id @default(cuid())
+  title     String
+  category  String
+  amount    Decimal  @db.Decimal(18,2)
+  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  date      DateTime @default(now())
+}
+
+model Staff {
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String?  @unique
+  role      String
+  createdAt DateTime @default(now())
+}
+
+model Payroll {
+  id        String   @id @default(cuid())
+  staffId   String
+  month     String
+  gross     Decimal  @db.Decimal(18,2)
+  deductions Decimal  @db.Decimal(18,2) @default(0)
+  net       Decimal  @db.Decimal(18,2)
+  createdAt DateTime @default(now())
+  staff     Staff    @relation(fields:[staffId], references:[id])
+}
+
+model Asset {
+  id        String   @id @default(cuid())
+  tag       String   @unique
+  name      String
+  category  String
+  condition String
+  createdAt DateTime @default(now())
+}
