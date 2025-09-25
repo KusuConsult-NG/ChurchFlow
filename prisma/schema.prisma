@@ -1,0 +1,443 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth.js required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                      String    @id @default(cuid())
+  name                    String?
+  email                   String    @unique
+  emailVerified           DateTime?
+  image                   String?
+  password                String?
+  role                    String    @default("MEMBER")
+  twoFactorSecret         String?
+  twoFactorEnabled        Boolean   @default(false)
+  twoFactorMethod         String?   // TOTP, MAGIC_LINK
+  resetPasswordToken      String?   @unique
+  resetPasswordExpires    DateTime?
+  districtId              String?
+  agencyId                String?
+  subDistrictId           String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // Relations
+  accounts                Account[]
+  sessions                Session[]
+  announcements           Announcement[]
+  projects                Project[]
+  requisitions            Requisition[]
+  transactions            Transaction[]
+  events                  Event[]
+  members                 Member[]
+  budgets                 Budget[]
+  complianceIssues        ComplianceIssue[] @relation("ComplianceCreator")
+  dataExports             DataExport[]
+  notificationTemplates   NotificationTemplate[]
+  leaveRequests           LeaveRequest[]
+  auditLogs               AuditLog[]
+  accountStatements       AccountStatement[]
+  fundTransfers           FundTransfer[]
+  hrReports               HrReport[]
+  approvalWorkflows       ApprovalWorkflow[]
+  approvalRequests        ApprovalRequest[]
+  
+  // Additional relations
+  requisitionApprovals    Requisition[]     @relation("RequisitionApprover")
+  complianceAssignments   ComplianceIssue[] @relation("ComplianceAssignee")
+  leaveApprovals          LeaveRequest[]    @relation("LeaveApprover")
+  fundTransferApprovals   FundTransfer[]    @relation("FundTransferApprover")
+  approvalApprovals       ApprovalRequest[] @relation("ApprovalApprover")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Church Management Models
+model Member {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String?  @unique
+  phone       String?
+  address     String?
+  dateOfBirth DateTime?
+  joinDate    DateTime @default(now())
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED
+  districtId  String?
+  agencyId    String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User         @relation(fields: [createdBy], references: [id])
+  attendance  Attendance[]
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+  budget      Float?
+  status      String   @default("PLANNING") // PLANNING, ACTIVE, COMPLETED, CANCELLED
+  districtId  String?
+  agencyId    String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user         User         @relation(fields: [createdBy], references: [id])
+  requisitions Requisition[]
+}
+
+model Requisition {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  amount      Float
+  category    String   // SUPPLIES, EQUIPMENT, SERVICES, etc.
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED, COMPLETED
+  projectId   String?
+  districtId  String?
+  agencyId    String?
+  createdBy   String
+  approvedBy  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  project Project? @relation(fields: [projectId], references: [id])
+  user    User     @relation(fields: [createdBy], references: [id])
+  approver User?   @relation("RequisitionApprover", fields: [approvedBy], references: [id])
+}
+
+model AccountBook {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // GENERAL_FUND, BUILDING_FUND, MISSION_FUND, etc.
+  description String?
+  balance     Float    @default(0)
+  districtId  String?
+  agencyId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  transactions Transaction[]
+  statements   AccountStatement[]
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  amount      Float
+  type        String   // DEPOSIT, WITHDRAWAL, TRANSFER
+  description String?
+  category    String?  // OFFERING, TITHE, DONATION, EXPENSE, etc.
+  bookId      String
+  districtId  String?
+  agencyId    String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  book AccountBook @relation(fields: [bookId], references: [id])
+  user User        @relation(fields: [createdBy], references: [id])
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime
+  location    String?
+  type        String   @default("GENERAL") // GENERAL, MEETING, SERVICE, etc.
+  status      String   @default("SCHEDULED") // SCHEDULED, CANCELLED, COMPLETED
+  districtId  String?
+  agencyId    String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User         @relation(fields: [createdBy], references: [id])
+  attendance  Attendance[]
+}
+
+model Attendance {
+  id        String   @id @default(cuid())
+  eventId   String
+  memberId  String
+  status    String   @default("PRESENT") // PRESENT, ABSENT, LATE
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  event   Event  @relation(fields: [eventId], references: [id])
+  member  Member @relation(fields: [memberId], references: [id])
+}
+
+model Budget {
+  id              String   @id @default(cuid())
+  year            Int
+  amount          Float
+  category        String   // OPERATIONS, MISSIONS, MAINTENANCE, etc.
+  description     String?
+  department      String?
+  districtId      String?
+  agencyId        String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [createdBy], references: [id])
+}
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  type        String   @default("GENERAL") // GENERAL, URGENT, EVENT, etc.
+  districtId  String?
+  agencyId    String?
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+}
+
+model ComplianceIssue {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  category    String   // FINANCIAL, DATA_PROTECTION, REGULATORY, etc.
+  severity    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  status      String   @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  priority    String   @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  assignedTo  String?
+  dueDate     DateTime?
+  resolvedAt  DateTime?
+  closedAt    DateTime?
+  districtId  String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  creator   User  @relation("ComplianceCreator", fields: [createdBy], references: [id])
+  assignee  User? @relation("ComplianceAssignee", fields: [assignedTo], references: [id])
+}
+
+model DataExport {
+  id            String   @id @default(cuid())
+  dataTypes     String   // Comma-separated list of data types to export
+  format        String   // CSV, XLSX, JSON, PDF
+  status        String   @default("PROCESSING") // PROCESSING, COMPLETED, FAILED
+  filePath      String?
+  districtId    String?
+  agencyId      String?
+  requestedBy   String
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+
+  // Relations
+  user User @relation(fields: [requestedBy], references: [id])
+}
+
+model NotificationTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String   // EMAIL, SMS, PUSH, etc.
+  trigger     String   // MANUAL, SCHEDULED, EVENT_BASED, CONDITIONAL
+  template    String
+  recipients  String   // Comma-separated list of recipient groups
+  conditions  String?  // JSON string for conditional triggers
+  isActive    Boolean  @default(true)
+  districtId  String?
+  agencyId    String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [createdBy], references: [id])
+}
+
+model LeaveRequest {
+  id            String   @id @default(cuid())
+  employeeId    String
+  startDate     DateTime
+  endDate       DateTime
+  reason        String
+  leaveType     String   // SICK, VACATION, PERSONAL, etc.
+  contactPhone  String
+  workHandover  String?
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
+  comments      String?
+  approvedBy    String?
+  districtId    String?
+  agencyId      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user     User  @relation(fields: [employeeId], references: [id])
+  approver User? @relation("LeaveApprover", fields: [approvedBy], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // CREATE, UPDATE, DELETE, LOGIN, etc.
+  entity    String   // User, Transaction, etc.
+  entityId  String
+  userId    String
+  details   String?  // Additional details as JSON string
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+}
+
+model AccountStatement {
+  id          String   @id @default(cuid())
+  accountId   String
+  startDate   DateTime
+  endDate     DateTime
+  status      String   @default("PROCESSING") // PROCESSING, COMPLETED, FAILED
+  filePath    String?
+  generatedBy String
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+
+  // Relations
+  account AccountBook @relation(fields: [accountId], references: [id])
+  user    User        @relation(fields: [generatedBy], references: [id])
+}
+
+model FundTransfer {
+  id            String   @id @default(cuid())
+  fromAccount   String
+  toAccount     String
+  amount        Float
+  reason        String
+  transferType  String   // INTERNAL, EXTERNAL, etc.
+  status        String   @default("PENDING") // PENDING, APPROVED, COMPLETED, REJECTED
+  approvedBy    String?
+  districtId    String?
+  agencyId      String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  creator   User  @relation(fields: [createdBy], references: [id])
+  approver  User? @relation("FundTransferApprover", fields: [approvedBy], references: [id])
+}
+
+model HrReport {
+  id        String   @id @default(cuid())
+  title     String
+  type      String   // PAYROLL, ATTENDANCE, PERFORMANCE, etc.
+  startDate DateTime
+  endDate   DateTime
+  filters   String?  // JSON string for report filters
+  format    String   // PDF, EXCEL, CSV, WORD
+  status    String   @default("PROCESSING") // PROCESSING, COMPLETED, FAILED
+  data      String?  // Generated report data as JSON string
+  filePath  String?
+  districtId String?
+  agencyId  String?
+  createdBy String
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+
+  // Relations
+  user User @relation(fields: [createdBy], references: [id])
+}
+
+model ApprovalWorkflow {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  approvalLevels  String   // JSON string array of approval levels
+  amountThreshold Float?
+  isActive        Boolean  @default(true)
+  districtId      String?
+  agencyId        String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  createdByUser User             @relation(fields: [createdBy], references: [id])
+  requests      ApprovalRequest[]
+}
+
+model ApprovalRequest {
+  id            String   @id @default(cuid())
+  workflowId    String
+  entityType    String   // REQUISITION, FUND_TRANSFER, etc.
+  entityId      String
+  requestedBy   String
+  approvedBy    String?
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedAt    DateTime?
+  comments      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  workflow        ApprovalWorkflow @relation(fields: [workflowId], references: [id])
+  requestedByUser User @relation(fields: [requestedBy], references: [id])
+  approvedByUser  User? @relation("ApprovalApprover", fields: [approvedBy], references: [id])
+}
