@@ -1,321 +1,163 @@
-'use client';
-import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { PrismaClient } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../../lib/auth";
 
-export default function DataExport() {
-  const { data: session } = useSession();
-  const [exportJobs, setExportJobs] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportConfig, setExportConfig] = useState({
-    dataTypes: [],
-    format: 'CSV',
-    dateRange: {
-      start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-      end: new Date().toISOString().split('T')[0]
-    },
-    includeArchived: false
-  });
+const prisma = new PrismaClient();
 
-  useEffect(() => {
-    fetchExportJobs();
-  }, []);
+export const revalidate = 60;
 
-  const fetchExportJobs = async () => {
-    try {
-      const response = await fetch('/api/data-export');
-      const data = await response.json();
-      setExportJobs(data.jobs || []);
-    } catch (error) {
-      console.error('Error fetching export jobs:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleExport = async () => {
-    if (exportConfig.dataTypes.length === 0) {
-      alert('Please select at least one data type to export');
-      return;
-    }
-
-    setIsExporting(true);
-    try {
-      const response = await fetch('/api/data-export/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(exportConfig),
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `churchflow-export-${new Date().toISOString().split('T')[0]}.${exportConfig.format.toLowerCase()}`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        fetchExportJobs();
-      } else {
-        const error = await response.json();
-        alert(error.message || 'Failed to export data');
-      }
-    } catch (error) {
-      alert('An error occurred. Please try again.');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleDataTypeChange = (dataType) => {
-    setExportConfig(prev => ({
-      ...prev,
-      dataTypes: prev.dataTypes.includes(dataType)
-        ? prev.dataTypes.filter(type => type !== dataType)
-        : [...prev.dataTypes, dataType]
-    }));
-  };
-
-  const dataTypes = [
-    { id: 'members', name: 'Members', description: 'Member information and contact details' },
-    { id: 'transactions', name: 'Transactions', description: 'Financial transactions and records' },
-    { id: 'events', name: 'Events', description: 'Church events and activities' },
-    { id: 'attendance', name: 'Attendance', description: 'Attendance records and statistics' },
-    { id: 'announcements', name: 'Announcements', description: 'Church announcements and communications' },
-    { id: 'projects', name: 'Projects', description: 'Ministry projects and initiatives' },
-    { id: 'requisitions', name: 'Requisitions', description: 'Expense requisitions and approvals' },
-    { id: 'accounts', name: 'Accounts', description: 'Account books and financial accounts' }
-  ];
-
-  if (isLoading) {
+export default async function DataExport() {
+  const session = await getServerSession(authOptions);
+  
+  if (!session || session.user.role !== 'ADMIN') {
     return (
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-gray-600">Loading export options...</div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
+          <p className="text-gray-600">You need admin privileges to access this page.</p>
         </div>
-      </main>
+      </div>
     );
   }
+
+  // Fetch export jobs from database
+  let exportJobs = [];
+  
+  try {
+    exportJobs = await prisma.dataExport.findMany({
+      include: {
+        user: { select: { name: true, email: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20
+    });
+  } catch (error) {
+    console.error('Error fetching export jobs:', error);
+  }
+
+  const exportTypes = [
+    { id: 'members', name: 'Members', description: 'Export all member information and contact details' },
+    { id: 'transactions', name: 'Transactions', description: 'Export financial transaction records' },
+    { id: 'events', name: 'Events', description: 'Export event data and attendance records' },
+    { id: 'announcements', name: 'Announcements', description: 'Export all announcements and communications' },
+    { id: 'giving', name: 'Giving Records', description: 'Export donation and giving history' },
+    { id: 'attendance', name: 'Attendance', description: 'Export attendance tracking data' }
+  ];
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Data Export & Backup</h1>
-        <p className="mt-2 text-gray-600">Export and backup your church data</p>
+        <p className="mt-2 text-gray-600">Export church data for backup, analysis, or migration purposes</p>
       </div>
 
-      {/* Export Configuration */}
-      <div className="card mb-8">
-        <div className="card-header">
-          <h2 className="text-xl font-semibold text-gray-900">Export Configuration</h2>
-          <p className="text-gray-600">Select data types and configure export settings</p>
-        </div>
+      {/* Export Options */}
+      <section className="mb-12">
+        <div className="card">
+          <div className="card-header">
+            <h2 className="text-xl font-semibold text-gray-900">Export Data</h2>
+            <p className="text-gray-600">Choose what data to export and download</p>
+          </div>
 
-        <div className="space-y-6">
-          {/* Data Types Selection */}
-          <div>
-            <label className="form-label">Select Data Types</label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-              {dataTypes.map((dataType) => (
-                <label key={dataType.id} className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={exportConfig.dataTypes.includes(dataType.id)}
-                    onChange={() => handleDataTypeChange(dataType.id)}
-                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900">{dataType.name}</div>
-                    <div className="text-sm text-gray-500">{dataType.description}</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {exportTypes.map((type) => (
+              <div key={type.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors group">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
                   </div>
-                </label>
-              ))}
-            </div>
+                  <button className="btn-primary text-xs">Export</button>
+                </div>
+                <h3 className="font-medium text-gray-900 mb-2">{type.name}</h3>
+                <p className="text-sm text-gray-600">{type.description}</p>
+              </div>
+            ))}
           </div>
 
-          {/* Export Settings */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="form-label">Export Format</label>
-              <select
-                value={exportConfig.format}
-                onChange={(e) => setExportConfig({...exportConfig, format: e.target.value})}
-                className="form-input"
-              >
-                <option value="CSV">CSV (Comma Separated Values)</option>
-                <option value="XLSX">Excel (XLSX)</option>
-                <option value="JSON">JSON</option>
-                <option value="PDF">PDF Report</option>
-              </select>
+          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex">
+              <svg className="w-5 h-5 text-yellow-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 18.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <div>
+                <h3 className="text-sm font-medium text-yellow-800">Export Guidelines</h3>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Exported data contains sensitive information. Please handle with care and follow data protection policies.
+                </p>
+              </div>
             </div>
-
-            <div>
-              <label className="form-label">Start Date</label>
-              <input
-                type="date"
-                value={exportConfig.dateRange.start}
-                onChange={(e) => setExportConfig({
-                  ...exportConfig,
-                  dateRange: {...exportConfig.dateRange, start: e.target.value}
-                })}
-                className="form-input"
-              />
-            </div>
-
-            <div>
-              <label className="form-label">End Date</label>
-              <input
-                type="date"
-                value={exportConfig.dateRange.end}
-                onChange={(e) => setExportConfig({
-                  ...exportConfig,
-                  dateRange: {...exportConfig.dateRange, end: e.target.value}
-                })}
-                className="form-input"
-              />
-            </div>
-          </div>
-
-          {/* Additional Options */}
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="includeArchived"
-              checked={exportConfig.includeArchived}
-              onChange={(e) => setExportConfig({...exportConfig, includeArchived: e.target.checked})}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="includeArchived" className="ml-2 block text-sm text-gray-900">
-              Include archived records
-            </label>
-          </div>
-
-          {/* Export Actions */}
-          <div className="flex space-x-4">
-            <button
-              onClick={handleExport}
-              disabled={isExporting || exportConfig.dataTypes.length === 0}
-              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isExporting ? 'Exporting...' : 'Export Data'}
-            </button>
-            <button
-              onClick={() => {
-                setExportConfig({
-                  dataTypes: [],
-                  format: 'CSV',
-                  dateRange: {
-                    start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-                    end: new Date().toISOString().split('T')[0]
-                  },
-                  includeArchived: false
-                });
-              }}
-              className="btn-secondary"
-            >
-              Reset
-            </button>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Export History */}
-      <div className="card">
-        <div className="card-header">
-          <h2 className="text-xl font-semibold text-gray-900">Export History</h2>
-          <p className="text-gray-600">Previously generated exports</p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Data Types
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Format
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date Range
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Generated
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {exportJobs.map((job) => (
-                <tr key={job.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {job.dataTypes.map(type => dataTypes.find(dt => dt.id === type)?.name).join(', ')}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {job.format}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(job.startDate).toLocaleDateString()} - {new Date(job.endDate).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(job.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`status-badge ${
-                      job.status === 'COMPLETED' ? 'status-completed' :
-                      job.status === 'PROCESSING' ? 'status-pending' :
-                      'status-rejected'
-                    }`}>
-                      {job.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      {job.status === 'COMPLETED' && (
-                        <a
-                          href={`/api/data-export/${job.id}/download`}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          Download
-                        </a>
-                      )}
-                      <button
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete this export job?')) {
-                            // Handle delete
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {exportJobs.length === 0 && (
-          <div className="text-center py-12">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No exports generated</h3>
-            <p className="mt-1 text-sm text-gray-500">Get started by creating your first data export.</p>
+      <section>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="text-xl font-semibold text-gray-900">Export History</h2>
+            <p className="text-gray-600">Recent data export jobs and their status</p>
           </div>
-        )}
-      </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {exportJobs.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                      No export jobs found. Start by creating your first data export.
+                    </td>
+                  </tr>
+                ) : (
+                  exportJobs.map((job) => (
+                    <tr key={job.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{job.exportType}</div>
+                        <div className="text-sm text-gray-500">{job.format} format</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          job.status === 'COMPLETED' 
+                            ? 'bg-green-100 text-green-800' 
+                            : job.status === 'PROCESSING'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {job.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {job.user?.name || 'Unknown'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(job.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex space-x-2">
+                          {job.status === 'COMPLETED' && (
+                            <button className="btn-secondary text-xs">Download</button>
+                          )}
+                          <button className="text-red-600 hover:text-red-900 text-xs">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

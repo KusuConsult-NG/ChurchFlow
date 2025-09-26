@@ -1,282 +1,158 @@
-'use client';
-import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { PrismaClient } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../../lib/auth";
 
-export default function ApprovalWorkflows() {
-  const { data: session } = useSession();
-  const [workflows, setWorkflows] = useState([]);
-  const [pendingApprovals, setPendingApprovals] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    approvalLevels: [],
-    amountThreshold: '',
-    department: '',
-    isActive: true
-  });
+const prisma = new PrismaClient();
 
-  useEffect(() => {
-    fetchWorkflows();
-    fetchPendingApprovals();
-  }, []);
+export const revalidate = 60;
 
-  const fetchWorkflows = async () => {
-    try {
-      const response = await fetch('/api/approval-workflows');
-      const data = await response.json();
-      setWorkflows(data.workflows || []);
-    } catch (error) {
-      console.error('Error fetching workflows:', error);
-    }
-  };
-
-  const fetchPendingApprovals = async () => {
-    try {
-      const response = await fetch('/api/approval-workflows/pending');
-      const data = await response.json();
-      setPendingApprovals(data.approvals || []);
-    } catch (error) {
-      console.error('Error fetching pending approvals:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleApprove = async (approvalId, action) => {
-    try {
-      const response = await fetch(`/api/approval-workflows/${approvalId}/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (response.ok) {
-        fetchPendingApprovals();
-        alert(`Request ${action}d successfully`);
-      } else {
-        const error = await response.json();
-        alert(error.message || `Failed to ${action} request`);
-      }
-    } catch (error) {
-      alert('An error occurred. Please try again.');
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/approval-workflows', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        setShowCreateForm(false);
-        setFormData({
-          name: '',
-          description: '',
-          approvalLevels: [],
-          amountThreshold: '',
-          department: '',
-          isActive: true
-        });
-        fetchWorkflows();
-      } else {
-        const error = await response.json();
-        alert(error.message || 'Failed to create workflow');
-      }
-    } catch (error) {
-      alert('An error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  if (isLoading) {
+export default async function ApprovalWorkflows() {
+  const session = await getServerSession(authOptions);
+  
+  if (!session || session.user.role !== 'ADMIN') {
     return (
-      <main className="p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-gray-600">Loading approval workflows...</div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
+          <p className="text-gray-600">You need admin privileges to access this page.</p>
         </div>
-      </main>
+      </div>
     );
   }
 
+  // Fetch workflows and approvals from database
+  let workflows = [];
+  let pendingApprovals = [];
+  
+  try {
+    [workflows, pendingApprovals] = await Promise.all([
+      prisma.approvalWorkflow.findMany({
+        include: {
+          createdByUser: { select: { name: true, email: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.approvalRequest.findMany({
+        where: { status: 'PENDING' },
+        include: {
+          workflow: { select: { name: true } },
+          requester: { select: { name: true, email: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+    ]);
+  } catch (error) {
+    console.error('Error fetching approval workflows:', error);
+  }
+
   return (
-    <main className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Approval Workflows</h1>
-        <button
-          onClick={() => setShowCreateForm(true)}
-          className="h-10 px-4 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-        >
-          Create Workflow
-        </button>
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Approval Workflows</h1>
+        <p className="mt-2 text-gray-600">Manage approval processes and pending requests</p>
       </div>
 
-      {/* Pending Approvals */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Pending Approvals</h2>
-        <div className="space-y-4">
-          {pendingApprovals.map((approval) => (
-            <div key={approval.id} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-4">
+      {/* Workflows Section */}
+      <section className="mb-12">
+        <div className="card">
+          <div className="card-header">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Workflow Templates</h2>
+                <p className="text-gray-600">Define approval processes for different types of requests</p>
+              </div>
+              <button className="btn-primary">
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create Workflow
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {workflows.length === 0 ? (
+              <div className="text-center py-8">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No workflows</h3>
+                <p className="mt-1 text-sm text-gray-500">Get started by creating your first approval workflow.</p>
+              </div>
+            ) : (
+              workflows.map((workflow) => (
+                <div key={workflow.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-medium text-gray-900">{approval.title}</h3>
-                      <p className="text-sm text-gray-500">{approval.description}</p>
-                      <p className="text-xs text-gray-600">
-                        Requested by: {approval.requestedBy} • Amount: ${approval.amount?.toLocaleString()}
-                      </p>
+                      <h3 className="font-medium text-gray-900">{workflow.name}</h3>
+                      <p className="text-sm text-gray-600 mt-1">{workflow.description}</p>
+                      <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                        <span>Created by: {workflow.createdByUser?.name || 'Unknown'}</span>
+                        <span>•</span>
+                        <span>Status: {workflow.isActive ? 'Active' : 'Inactive'}</span>
+                        {workflow.amountThreshold && (
+                          <>
+                            <span>•</span>
+                            <span>Threshold: ${workflow.amountThreshold}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button className="btn-secondary text-xs">Edit</button>
+                      <button className="btn-danger text-xs">Delete</button>
                     </div>
                   </div>
                 </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleApprove(approval.id, 'approve')}
-                    className="px-3 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full hover:bg-green-200"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => handleApprove(approval.id, 'reject')}
-                    className="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-full hover:bg-red-200"
-                  >
-                    Reject
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Workflow Templates */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Workflow Templates</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {workflows.map((workflow) => (
-            <div key={workflow.id} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium text-gray-900">{workflow.name}</h3>
-                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                  workflow.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {workflow.isActive ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 mb-2">{workflow.description}</p>
-              <div className="text-xs text-gray-500">
-                Threshold: ${workflow.amountThreshold?.toLocaleString() || 'N/A'}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Create Workflow Form Modal */}
-      {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Create Approval Workflow</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Workflow Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  className="w-full h-10 px-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  required
-                  rows={3}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount Threshold</label>
-                <input
-                  type="number"
-                  name="amountThreshold"
-                  value={formData.amountThreshold}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  className="w-full h-10 px-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                <select
-                  name="department"
-                  value={formData.department}
-                  onChange={handleChange}
-                  required
-                  className="w-full h-10 px-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select department</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Ministry">Ministry</option>
-                  <option value="Administration">Administration</option>
-                  <option value="Mission">Mission</option>
-                </select>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="isActive"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label className="ml-2 text-sm text-gray-700">Active Workflow</label>
-              </div>
-
-              <div className="flex space-x-4">
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="flex-1 h-10 px-4 rounded-lg bg-blue-600 text-white disabled:opacity-50"
-                >
-                  {isLoading ? 'Creating...' : 'Create Workflow'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateForm(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+              ))
+            )}
           </div>
         </div>
-      )}
+      </section>
+
+      {/* Pending Approvals Section */}
+      <section>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="text-xl font-semibold text-gray-900">Pending Approvals</h2>
+            <p className="text-gray-600">Requests waiting for approval</p>
+          </div>
+
+          <div className="space-y-4">
+            {pendingApprovals.length === 0 ? (
+              <div className="text-center py-8">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No pending approvals</h3>
+                <p className="mt-1 text-sm text-gray-500">All approval requests have been processed.</p>
+              </div>
+            ) : (
+              pendingApprovals.map((approval) => (
+                <div key={approval.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-medium text-gray-900">{approval.workflow?.name}</h3>
+                      <p className="text-sm text-gray-600 mt-1">{approval.description}</p>
+                      <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                        <span>Requested by: {approval.requester?.name || 'Unknown'}</span>
+                        <span>•</span>
+                        <span>Amount: ${approval.amount}</span>
+                        <span>•</span>
+                        <span>Priority: {approval.priority}</span>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button className="btn-success text-xs">Approve</button>
+                      <button className="btn-danger text-xs">Reject</button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

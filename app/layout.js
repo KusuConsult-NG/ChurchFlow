@@ -1,11 +1,14 @@
 import "./globals.css";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../lib/auth";
+import Providers from "./providers";
+
 export const metadata={ title:'ChurchFlow', description:'Server-first Next.js' };
 export default async function RootLayout({ children }){
   const session=await getServerSession(authOptions); const user=session?.user;
   return (<html lang="en"><body className="min-h-screen bg-gray-50">
-    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+    <Providers>
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo and Brand */}
@@ -70,5 +73,6 @@ export default async function RootLayout({ children }){
     <main className="min-h-screen">
       {children}
     </main>
+    </Providers>
   </body></html>);
 }
