@@ -1,12 +1,31 @@
-import { PrismaClient } from "@prisma/client"; export const revalidate=60;
-const prisma=new PrismaClient();
-export default async function Dashboard(){
-  const [ann,proj,reqs,books,tx,mem,ev,att] = await Promise.all([
-    prisma.announcement.count(), prisma.project.count(), prisma.requisition.count(),
-    prisma.accountBook.count(), prisma.transaction.count(), prisma.member.count(),
-    prisma.event.count(), prisma.attendance.count()
+import { PrismaClient } from "@prisma/client";
+
+export const revalidate = 60;
+
+const prisma = new PrismaClient();
+
+export default async function Dashboard() {
+  const [ann, proj, reqs, books, tx, mem, ev, att] = await Promise.all([
+    prisma.announcement.count(),
+    prisma.project.count(),
+    prisma.requisition.count(),
+    prisma.accountBook.count(),
+    prisma.transaction.count(),
+    prisma.member.count(),
+    prisma.event.count(),
+    prisma.attendance.count()
   ]);
-  const cards=[['Announcements',ann,'/announcements'],['Projects',proj,'/admin/projects'],['Requisitions',reqs,'/admin/requisitions'],['Accounts',books,'/admin/accounts'],['Transactions',tx,'/giving'],['Members',mem,'/members'],['Events',ev,'/events'],['Attendance',att,'/attendance']];
+
+  const cards = [
+    ['Announcements', ann, '/announcements'],
+    ['Projects', proj, '/admin/projects'],
+    ['Requisitions', reqs, '/admin/requisitions'],
+    ['Accounts', books, '/admin/accounts'],
+    ['Transactions', tx, '/giving'],
+    ['Members', mem, '/members'],
+    ['Events', ev, '/events'],
+    ['Attendance', att, '/attendance']
+  ];
   return (<main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div className="mb-8">
       <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
