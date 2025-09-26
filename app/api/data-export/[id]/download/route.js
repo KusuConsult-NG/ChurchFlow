@@ -17,7 +17,7 @@ export async function GET(req, { params }) {
     // Get the export job
     const exportJob = await prisma.dataExport.findUnique({
       where: { id },
-      include: { createdBy: { select: { name: true, email: true } } }
+      include: { user: { select: { name: true, email: true } } }
     });
 
     if (!exportJob) {

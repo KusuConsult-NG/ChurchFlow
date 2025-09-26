@@ -80,8 +80,8 @@ export async function GET(req) {
       where: whereClause,
       orderBy: { createdAt: 'desc' },
       include: {
-        createdBy: { select: { name: true, email: true } },
-        assignedTo: { select: { name: true, email: true } },
+        creator: { select: { name: true, email: true } },
+        assignee: { select: { name: true, email: true } },
       },
     });
 

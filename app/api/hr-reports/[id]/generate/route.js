@@ -17,7 +17,7 @@ export async function POST(req, { params }) {
     // Get the HR report
     const report = await prisma.hrReport.findUnique({
       where: { id },
-      include: { createdBy: { select: { name: true, email: true } } }
+      include: { user: { select: { name: true, email: true } } }
     });
 
     if (!report) {

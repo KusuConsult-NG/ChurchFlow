@@ -22,7 +22,7 @@ export async function PATCH(req, { params }) {
     // Get the issue first
     const issue = await prisma.complianceIssue.findUnique({
       where: { id },
-      include: { createdBy: { select: { name: true } } }
+      include: { creator: { select: { name: true } } }
     });
 
     if (!issue) {
