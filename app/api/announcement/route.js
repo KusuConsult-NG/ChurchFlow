@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../lib/auth";
-import { ApiResponse, withErrorHandling, getPaginationParams, validateRequest, logApiCall } from "../../lib/api-utils";
+import { authOptions } from "../../../lib/auth";
+import { ApiResponse, withErrorHandling, getPaginationParams, validateRequest, logApiCall } from "../../../lib/api-utils";
 
 const prisma = new PrismaClient();
 

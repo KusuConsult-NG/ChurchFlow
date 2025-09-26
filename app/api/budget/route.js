@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../lib/auth';
+import { authOptions } from '../../../lib/auth';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -77,7 +77,7 @@ export async function GET(req) {
     const url = new URL(req.url);
     const year = url.searchParams.get('year') || new Date().getFullYear();
     const page = Math.max(1, Number(url.searchParams.get('page') || 1));
-    const pageSize = Math.max(1, Math.min(50, Number(url.searchParams.get('pageSize') || 10));
+    const pageSize = Math.max(1, Math.min(50, Number(url.searchParams.get('pageSize') || 10)));
 
     const [budgets, total] = await Promise.all([
       prisma.budget.findMany({

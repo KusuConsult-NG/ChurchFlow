@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../../lib/auth';
+import { authOptions } from '../../../../lib/auth';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -47,31 +47,68 @@ export async function GET(req) {
     const totalExpenses = expenses._sum.amount || 0;
     const netIncome = totalRevenue - totalExpenses;
 
-    // Calculate growth rate (simplified)
-    const previousPeriodRevenue = totalRevenue * 0.8; // Mock previous period
+    // Calculate growth rate (compare with previous period)
+    const previousStartDate = new Date(startDate);
+    const previousEndDate = new Date(endDate);
+    const periodLength = endDate.getTime() - startDate.getTime();
+    previousStartDate.setTime(previousStartDate.getTime() - periodLength);
+    previousEndDate.setTime(previousEndDate.getTime() - periodLength);
+
+    const previousRevenue = await prisma.transaction.aggregate({
+      where: {
+        type: 'DEPOSIT',
+        createdAt: { gte: previousStartDate, lte: previousEndDate }
+      },
+      _sum: { amount: true }
+    });
+
+    const previousPeriodRevenue = previousRevenue._sum.amount || 0;
     const growthRate = previousPeriodRevenue > 0 ? ((totalRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100 : 0;
 
-    // Income source analysis
-    const incomeSources = [
-      { name: 'Tithes & Offerings', amount: totalRevenue * 0.6, percentage: 60 },
-      { name: 'Special Events', amount: totalRevenue * 0.2, percentage: 20 },
-      { name: 'Donations', amount: totalRevenue * 0.15, percentage: 15 },
-      { name: 'Other Income', amount: totalRevenue * 0.05, percentage: 5 }
-    ];
+    // Real income source analysis based on transaction categories
+    const incomeByCategory = await prisma.transaction.groupBy({
+      by: ['category'],
+      where: {
+        type: 'DEPOSIT',
+        createdAt: { gte: startDate, lte: endDate }
+      },
+      _sum: { amount: true }
+    });
 
-    // Expense category analysis
-    const expenseCategories = [
-      { name: 'Ministry Operations', amount: totalExpenses * 0.4, percentage: 40 },
-      { name: 'Administrative', amount: totalExpenses * 0.25, percentage: 25 },
-      { name: 'Building & Maintenance', amount: totalExpenses * 0.2, percentage: 20 },
-      { name: 'Mission & Outreach', amount: totalExpenses * 0.15, percentage: 15 }
-    ];
+    const incomeSources = incomeByCategory.map(item => ({
+      name: item.category || 'Uncategorized',
+      amount: item._sum.amount || 0,
+      percentage: totalRevenue > 0 ? ((item._sum.amount || 0) / totalRevenue) * 100 : 0
+    }));
 
-    // Financial health indicators
-    const currentAssets = totalRevenue * 0.3; // Mock current assets
-    const currentLiabilities = totalExpenses * 0.1; // Mock current liabilities
-    const totalDebt = totalExpenses * 0.2; // Mock total debt
-    const totalEquity = totalRevenue * 0.8; // Mock total equity
+    // Real expense category analysis
+    const expensesByCategory = await prisma.transaction.groupBy({
+      by: ['category'],
+      where: {
+        type: 'WITHDRAWAL',
+        createdAt: { gte: startDate, lte: endDate }
+      },
+      _sum: { amount: true }
+    });
+
+    const expenseCategories = expensesByCategory.map(item => ({
+      name: item.category || 'Uncategorized',
+      amount: item._sum.amount || 0,
+      percentage: totalExpenses > 0 ? ((item._sum.amount || 0) / totalExpenses) * 100 : 0
+    }));
+
+    // Real financial health indicators from account balances
+    const accountBalances = await prisma.accountBook.aggregate({
+      _sum: { balance: true }
+    });
+
+    const currentAssets = accountBalances._sum.balance || 0;
+    const currentLiabilities = totalExpenses * 0.1; // Estimate based on monthly expenses
+    const totalDebt = await prisma.transaction.aggregate({
+      where: { category: 'DEBT_PAYMENT' },
+      _sum: { amount: true }
+    });
+    const totalEquity = currentAssets - (totalDebt._sum.amount || 0);
 
     const liquidityRatio = currentLiabilities > 0 ? currentAssets / currentLiabilities : 0;
     const debtToEquityRatio = totalEquity > 0 ? totalDebt / totalEquity : 0;

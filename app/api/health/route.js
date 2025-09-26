@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { performanceMonitor, getMemoryUsage, getSystemMetrics, checkDatabaseHealth } from '../../lib/performance';
+import { performanceMonitor, getMemoryUsage, getSystemMetrics, checkDatabaseHealth } from '../../../lib/performance';
 
 const prisma = new PrismaClient();
 

@@ -32,6 +32,7 @@ export default async function RootLayout({ children }){
               <a href="/attendance" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors">Attendance</a>
               <a href="/fund-transfer" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors">Fund Transfer</a>
               <a href="/account-statements" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors">Statements</a>
+              <a href="/financial-reports" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors">Reports</a>
             </nav>
           </div>
 

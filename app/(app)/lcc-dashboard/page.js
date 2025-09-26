@@ -47,7 +47,7 @@ export default async function LCCDashboard() {
     }
   });
 
-  const localProjects = await prisma.project.findMany({
+  const recentLocalProjects = await prisma.project.findMany({
     where: { subDistrictId: session.user.subDistrictId },
     orderBy: { createdAt: 'desc' },
     take: 5,
@@ -191,7 +191,7 @@ export default async function LCCDashboard() {
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Local Projects</h3>
         <div className="space-y-3">
-          {localProjects.map((project) => (
+          {recentLocalProjects.map((project) => (
             <div key={project.id} className="flex items-center justify-between py-2 border-b border-gray-100">
               <div>
                 <p className="text-sm font-medium text-gray-900">{project.title}</p>

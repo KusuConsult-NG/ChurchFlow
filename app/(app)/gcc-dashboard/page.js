@@ -42,7 +42,7 @@ export default async function GCCDashboard() {
     }
   });
 
-  const globalProjects = await prisma.project.findMany({
+  const recentGlobalProjects = await prisma.project.findMany({
     where: { status: 'ACTIVE' },
     orderBy: { createdAt: 'desc' },
     take: 5,
@@ -166,7 +166,7 @@ export default async function GCCDashboard() {
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Global Projects</h3>
           <div className="space-y-3">
-            {globalProjects.map((project) => (
+            {recentGlobalProjects.map((project) => (
               <div key={project.id} className="flex items-center justify-between py-2 border-b border-gray-100">
                 <div>
                   <p className="text-sm font-medium text-gray-900">{project.title}</p>
