@@ -16,6 +16,24 @@ function AuthErrorContent() {
       return 'Access denied. You do not have permission to sign in.';
     case 'Verification':
       return 'The verification token has expired or has already been used.';
+    case 'OAuthCallback':
+      return 'There was an error processing your Google sign-in. This usually means the Google OAuth configuration needs to be updated.';
+    case 'OAuthSignin':
+      return 'There was an error initiating the Google sign-in process.';
+    case 'OAuthCreateAccount':
+      return 'There was an error creating your account with Google.';
+    case 'EmailCreateAccount':
+      return 'There was an error creating your account with this email.';
+    case 'Callback':
+      return 'There was an error during the authentication callback.';
+    case 'OAuthAccountNotLinked':
+      return 'This email is already associated with another account. Please sign in with your original method.';
+    case 'EmailSignin':
+      return 'There was an error sending the sign-in email.';
+    case 'CredentialsSignin':
+      return 'Invalid email or password. Please check your credentials and try again.';
+    case 'SessionRequired':
+      return 'Please sign in to access this page.';
     case 'Default':
       return 'An error occurred during authentication. Please try again.';
     default:
@@ -31,6 +49,24 @@ function AuthErrorContent() {
       return 'Access Denied';
     case 'Verification':
       return 'Verification Error';
+    case 'OAuthCallback':
+      return 'Google Sign-In Error';
+    case 'OAuthSignin':
+      return 'Google Sign-In Error';
+    case 'OAuthCreateAccount':
+      return 'Account Creation Error';
+    case 'EmailCreateAccount':
+      return 'Account Creation Error';
+    case 'Callback':
+      return 'Authentication Callback Error';
+    case 'OAuthAccountNotLinked':
+      return 'Account Linking Error';
+    case 'EmailSignin':
+      return 'Email Sign-In Error';
+    case 'CredentialsSignin':
+      return 'Sign-In Error';
+    case 'SessionRequired':
+      return 'Authentication Required';
     case 'Default':
       return 'Authentication Error';
     default:
