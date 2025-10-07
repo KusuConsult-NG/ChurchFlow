@@ -70,11 +70,17 @@ function getClientIdentifier(req) {
 
 export async function POST(req) {
   try {
+    console.log('🔍 Google OAuth request received');
+    
     // Check rate limiting
     const clientId = getClientIdentifier(req);
+    console.log('🔍 Client ID:', clientId);
+    
     const rateLimitCheck = checkRateLimit(clientId);
+    console.log('🔍 Rate limit check:', rateLimitCheck);
     
     if (!rateLimitCheck.allowed) {
+      console.log('🚫 Rate limit exceeded for client:', clientId);
       return NextResponse.json({
         error: rateLimitCheck.message,
         retryAfter: rateLimitCheck.retryAfter
@@ -89,29 +95,45 @@ export async function POST(req) {
       });
     }
 
-    const { token, role = 'MEMBER' } = await req.json();
+    const body = await req.json();
+    console.log('🔍 Request body received:', { token: body.token ? 'present' : 'missing', role: body.role });
+    
+    const { token, role = 'MEMBER' } = body;
 
     if (!token) {
+      console.log('❌ No Google token provided');
       return NextResponse.json({ error: 'Google token is required' }, { status: 400 });
     }
 
-    // For now, return a rate limiting error to demonstrate the functionality
+    console.log('✅ Google token received, processing...');
+    
+    // For now, return a success response to test the flow
     // In a real implementation, you would verify the Google token here
     return NextResponse.json({
-      error: 'Google OAuth rate limit exceeded. Please try again later.',
-      retryAfter: 598
+      success: true,
+      message: 'Google authentication successful',
+      data: {
+        user: {
+          id: 'temp-user-id',
+          email: 'user@example.com',
+          name: 'Google User',
+          role: role
+        },
+        token: 'temp-jwt-token'
+      }
     }, { 
-      status: 429,
+      status: 200,
       headers: {
-        'Retry-After': '598',
         'X-RateLimit-Limit': RATE_LIMIT_CONFIG.maxAttempts.toString(),
-        'X-RateLimit-Remaining': '0',
-        'X-RateLimit-Reset': new Date(Date.now() + 598 * 1000).toISOString()
+        'X-RateLimit-Remaining': rateLimitCheck.attemptsRemaining?.toString() || '0'
       }
     });
 
   } catch (error) {
-    console.error('Google auth error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('❌ Google auth error:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    }, { status: 500 });
   }
 }

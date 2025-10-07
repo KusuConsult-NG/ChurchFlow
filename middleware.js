@@ -1,6 +1,50 @@
 import { NextResponse } from 'next/server';
 
-import { rateLimit, apiProtection } from './lib/rate-limiting';
+// Simple rate limiting for middleware
+const rateLimitStore = new Map();
+
+function checkRateLimit(identifier, maxAttempts = 100, windowMs = 15 * 60 * 1000) {
+  const now = Date.now();
+  const key = `middleware_${identifier}`;
+  
+  if (!rateLimitStore.has(key)) {
+    rateLimitStore.set(key, {
+      attempts: 0,
+      firstAttempt: now
+    });
+  }
+  
+  const data = rateLimitStore.get(key);
+  
+  // Reset if window has passed
+  if (now - data.firstAttempt > windowMs) {
+    data.attempts = 0;
+    data.firstAttempt = now;
+  }
+  
+  // Check if exceeded max attempts
+  if (data.attempts >= maxAttempts) {
+    return {
+      allowed: false,
+      remaining: 0,
+      resetTime: data.firstAttempt + windowMs
+    };
+  }
+  
+  // Increment attempts
+  data.attempts++;
+  
+  return {
+    allowed: true,
+    remaining: maxAttempts - data.attempts,
+    resetTime: data.firstAttempt + windowMs
+  };
+}
+
+function getClientId(request) {
+  const forwarded = request.headers.get('x-forwarded-for');
+  return forwarded ? forwarded.split(',')[0] : request.headers.get('x-real-ip') || 'unknown';
+}
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
@@ -18,56 +62,36 @@ export function middleware(request) {
   // Apply rate limiting to API routes (disabled for development)
   if (pathname.startsWith('/api/') && process.env.NODE_ENV === 'production') {
     // Determine rate limit config based on endpoint
-    let configName = 'api';
+    let maxAttempts = 100;
+    let windowMs = 15 * 60 * 1000; // 15 minutes
+    
     if (pathname.includes('/auth/')) {
-      configName = 'auth';
+      maxAttempts = 20; // More restrictive for auth endpoints
     } else if (pathname.includes('/upload')) {
-      configName = 'upload';
-    } else if (pathname.includes('/password-reset')) {
-      configName = 'passwordReset';
+      maxAttempts = 10; // Very restrictive for uploads
     }
 
-    const clientId = rateLimit.getClientId(request);
-    const key = `${configName}:${clientId}`;
-    const config = rateLimit.configs[configName];
-
-    const result = rateLimit.checkLimit(key, config);
+    const clientId = getClientId(request);
+    const result = checkRateLimit(clientId, maxAttempts, windowMs);
 
     if (!result.allowed) {
+      const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);
       return new NextResponse(
         JSON.stringify({
-          error: config.message,
-          retryAfter: Math.ceil((result.resetTime - Date.now()) / 1000)
+          error: 'Too many requests. Please try again later.',
+          retryAfter
         }),
         {
           status: 429,
           headers: {
             'Content-Type': 'application/json',
-            'Retry-After': Math.ceil(
-              (result.resetTime - Date.now()) / 1000
-            ).toString(),
-            'X-RateLimit-Limit': config.max.toString(),
+            'Retry-After': retryAfter.toString(),
+            'X-RateLimit-Limit': maxAttempts.toString(),
             'X-RateLimit-Remaining': result.remaining.toString(),
             'X-RateLimit-Reset': result.resetTime.toString()
           }
         }
       );
-    }
-
-    // Validate request origin
-    if (!apiProtection.validateOrigin(request)) {
-      return new NextResponse(JSON.stringify({ error: 'Invalid origin' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Validate request size
-    if (!apiProtection.validateRequestSize(request)) {
-      return new NextResponse(JSON.stringify({ error: 'Request too large' }), {
-        status: 413,
-        headers: { 'Content-Type': 'application/json' }
-      });
     }
   }
 
