@@ -10,9 +10,25 @@ export const metadata = {
   description: 'Server-first Next.js'
 };
 
+// Force dynamic rendering for all pages
+export const dynamic = 'force-dynamic';
+
 export default async function RootLayout({ children }) {
-  const _session = await getServerSession(authOptions);
-  const user = _session?.user;
+  let _session = null;
+  let user = null;
+  
+  try {
+    // Check if required environment variables are present
+    if (!process.env.NEXTAUTH_SECRET || !process.env.NEXTAUTH_URL) {
+      console.warn('Missing NextAuth environment variables');
+    } else {
+      _session = await getServerSession(authOptions);
+      user = _session?.user;
+    }
+  } catch (error) {
+    console.error('Error getting session:', error);
+    // Continue without session if there's an error
+  }
   return (
     <html lang='en' suppressHydrationWarning>
       <body className='min-h-screen bg-gray-50'>

@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // App Router is stable in Next.js 14, no experimental config needed
+  // Force dynamic rendering for all pages
+  output: 'standalone',
+  // Disable static optimization for pages that use dynamic features
+  trailingSlash: false,
 };
 
 module.exports = nextConfig;

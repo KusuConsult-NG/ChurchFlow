@@ -3,9 +3,25 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function HomePage() {
+  const [envError, setEnvError] = useState(false);
+  
+  useEffect(() => {
+    // Check if we're in a production environment and show error if needed
+    if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+      // Check for common environment variable issues
+      fetch('/api/debug')
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'error' || !data.environmentVariables?.DATABASE_URL) {
+            setEnvError(true);
+          }
+        })
+        .catch(() => setEnvError(true));
+    }
+  }, []);
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
@@ -20,6 +36,54 @@ export default function HomePage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const router = useRouter();
+
+  // Show environment error if detected
+  if (envError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-bold text-gray-900 mb-2">Configuration Required</h1>
+            <p className="text-gray-600 mb-4">
+              The application needs environment variables to be configured in Vercel.
+            </p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <h3 className="font-medium text-yellow-800 mb-2">Required Environment Variables:</h3>
+              <ul className="text-sm text-yellow-700 space-y-1">
+                <li>• DATABASE_URL</li>
+                <li>• NEXTAUTH_URL</li>
+                <li>• NEXTAUTH_SECRET</li>
+                <li>• JWT_SECRET</li>
+                <li>• GOOGLE_CLIENT_ID</li>
+                <li>• GOOGLE_CLIENT_SECRET</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <Link 
+                href="/health" 
+                className="block w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Check System Status
+              </Link>
+              <a 
+                href="https://vercel.com/dashboard" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="block w-full bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Open Vercel Dashboard
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleChange = e => {
     setFormData({
