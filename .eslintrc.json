@@ -1,0 +1,81 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    // React specific rules
+    "react/no-unescaped-entities": "off",
+    "react/display-name": "off",
+    "react/prop-types": "off",
+
+    // Next.js specific rules
+    "@next/next/no-img-element": "off",
+    "@next/next/no-page-custom-font": "off",
+
+    // General JavaScript/TypeScript rules
+    "no-unused-vars": "off",
+    "no-console": "off",
+    "prefer-const": "error",
+    "no-var": "error",
+
+    // Import rules
+    "import/order": [
+      "error",
+      {
+        "groups": [
+          "builtin",
+          "external",
+          "internal",
+          "parent",
+          "sibling",
+          "index"
+        ],
+        "newlines-between": "always",
+        "alphabetize": {
+          "order": "asc",
+          "caseInsensitive": true
+        }
+      }
+    ],
+
+    // Code style rules
+    "indent": ["error", 2],
+    "quotes": ["error", "single"],
+    "semi": ["error", "always"],
+    "comma-dangle": ["error", "never"],
+    "object-curly-spacing": ["error", "always"],
+    "array-bracket-spacing": ["error", "never"],
+
+    // Accessibility rules
+    "jsx-a11y/alt-text": "error",
+    "jsx-a11y/anchor-has-content": "error",
+    "jsx-a11y/anchor-is-valid": "error",
+
+    // Performance rules
+    "react-hooks/exhaustive-deps": "off"
+  },
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "node": true
+  },
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    "out/",
+    "build/",
+    "dist/",
+    "*.config.js",
+    "*.config.ts"
+  ]
+}

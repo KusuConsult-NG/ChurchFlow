@@ -1,84 +1,116 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '../../../lib/auth';
-import { PrismaClient } from '@prisma/client';
+// app/api/notifications/route.js
+const { NextResponse } = require('next/server');
 
-const prisma = new PrismaClient();
+const {
+  notificationService,
+  notificationTemplates,
+  notificationUtils
+} = require('../../../lib/notification-service');
 
-export async function POST(req) {
+export async function POST(request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || !['ADMIN', 'GCC', 'DCC'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const body = await request.json();
+    const { type, recipients, channels, data } = body;
 
-    const { name, description, type, trigger, template, recipients, conditions, isActive } = await req.json();
-
-    // Validate required fields
-    if (!name || !description || !type || !trigger || !template || !recipients || recipients.length === 0) {
-      return NextResponse.json({ error: 'All required fields must be provided' }, { status: 400 });
-    }
-
-    // Create notification template
-    const notification = await prisma.notificationTemplate.create({
-      data: {
-        name,
-        description,
-        type,
-        trigger,
-        template,
-        recipients,
-        conditions: conditions || {},
-        isActive: isActive !== false,
-        createdBy: session.user.id,
-        createdAt: new Date(),
-      },
+    // Validate notification
+    const validation = notificationUtils.validateNotification({
+      content: data?.content,
+      to: recipients,
+      channels
     });
 
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'NOTIFICATION_CREATED',
-        entityType: 'NOTIFICATION_TEMPLATE',
-        entityId: notification.id,
-        userId: session.user.id,
-        details: {
-          name,
-          type,
-          trigger,
-          recipients: recipients.length,
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: 'Invalid notification data', details: validation.errors },
+        { status: 400 }
+      );
+    }
+
+    // Get template based on type
+    let notifications = [];
+
+    if (type && notificationTemplates[type]) {
+      // Use template
+      for (const recipient of recipients) {
+        const template = notificationTemplates[type](recipient, data);
+        notifications.push(template);
+      }
+    } else {
+      // Custom notification
+      notifications = recipients.map(recipient => ({
+        email: {
+          to: recipient.email,
+          subject: data.subject || 'Notification from ChurchFlow',
+          content: data.content
         },
-      },
-    });
+        sms: recipient.phone
+          ? {
+            to: recipient.phone,
+            content: data.content
+          }
+          : null,
+        push: {
+          title: data.title || 'ChurchFlow Notification',
+          body: data.content,
+          icon: '/icon-192x192.png'
+        }
+      }));
+    }
 
-    return NextResponse.json({ 
+    // Send notifications
+    const results = await notificationService.sendBulkNotifications(
+      notifications,
+      channels
+    );
+    const stats = notificationUtils.getNotificationStats(results);
+
+    return NextResponse.json({
       success: true,
-      notification,
-      message: 'Notification template created successfully' 
+      message: 'Notifications sent successfully',
+      stats,
+      results
     });
   } catch (error) {
-    console.error('Create notification error:', error);
-    return NextResponse.json({ error: 'Failed to create notification template' }, { status: 500 });
+    // console.error('❌ Notification API error:', error);
+    return NextResponse.json(
+      { error: 'Failed to send notifications', message: error.message },
+      { status: 500 }
+    );
   }
 }
 
-export async function GET(req) {
+export async function GET(request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const notifications = await prisma.notificationTemplate.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        createdBy: { select: { name: true, email: true } },
+    // Get notification statistics (mock implementation)
+    const stats = {
+      totalSent: 1250,
+      successRate: 98.5,
+      byChannel: {
+        email: { sent: 1200, success: 1185 },
+        sms: { sent: 45, success: 44 },
+        push: { sent: 5, success: 5 }
       },
-    });
+      recentActivity: [
+        {
+          id: 1,
+          type: 'welcome',
+          recipient: 'user@example.com',
+          channel: 'email',
+          status: 'sent',
+          timestamp: new Date().toISOString()
+        }
+      ]
+    };
 
-    return NextResponse.json({ notifications });
+    return NextResponse.json({
+      success: true,
+      stats
+    });
   } catch (error) {
-    console.error('Get notifications error:', error);
-    return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 });
+    // console.error('❌ Notification stats error:', error);
+    return NextResponse.json(
+      { error: 'Failed to get notification statistics' },
+      { status: 500 }
+    );
   }
 }

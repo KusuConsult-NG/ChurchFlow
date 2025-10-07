@@ -1,19 +1,25 @@
+import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+
 import { authOptions } from '../../../../lib/auth';
-import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || !['ADMIN', 'GCC', 'DCC', 'BANK_OPERATOR'].includes(session.user.role)) {
+    const _session = await getServerSession(authOptions);
+    if (
+      !session?.user ||
+      !['ADMIN', 'GCC', 'DCC', 'BANK_OPERATOR'].includes(session.user.role)
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const url = new URL(req.url);
-    const startDate = new Date(url.searchParams.get('start') || new Date(new Date().getFullYear(), 0, 1));
+    const startDate = new Date(
+      url.searchParams.get('start') || new Date(new Date().getFullYear(), 0, 1)
+    );
     const endDate = new Date(url.searchParams.get('end') || new Date());
 
     // Operating Activities
@@ -22,7 +28,13 @@ export async function GET(req) {
         type: 'DEPOSIT',
         createdAt: { gte: startDate, lte: endDate },
         category: {
-          in: ['TITHES', 'OFFERINGS', 'DONATIONS', 'SPECIAL_EVENTS', 'FUNDRAISING']
+          in: [
+            'TITHES',
+            'OFFERINGS',
+            'DONATIONS',
+            'SPECIAL_EVENTS',
+            'FUNDRAISING'
+          ]
         }
       },
       _sum: { amount: true }
@@ -33,7 +45,13 @@ export async function GET(req) {
         type: 'WITHDRAWAL',
         createdAt: { gte: startDate, lte: endDate },
         category: {
-          in: ['MINISTRY_OPERATIONS', 'ADMINISTRATIVE', 'UTILITIES', 'SALARIES', 'PROGRAMS']
+          in: [
+            'MINISTRY_OPERATIONS',
+            'ADMINISTRATIVE',
+            'UTILITIES',
+            'SALARIES',
+            'PROGRAMS'
+          ]
         }
       },
       _sum: { amount: true }
@@ -56,7 +74,12 @@ export async function GET(req) {
         type: 'WITHDRAWAL',
         createdAt: { gte: startDate, lte: endDate },
         category: {
-          in: ['BUILDING_MAINTENANCE', 'EQUIPMENT_PURCHASE', 'FACILITY_IMPROVEMENTS', 'INVESTMENTS']
+          in: [
+            'BUILDING_MAINTENANCE',
+            'EQUIPMENT_PURCHASE',
+            'FACILITY_IMPROVEMENTS',
+            'INVESTMENTS'
+          ]
         }
       },
       _sum: { amount: true }
@@ -86,10 +109,17 @@ export async function GET(req) {
     });
 
     // Calculate net cash flows
-    const netOperatingCashFlow = (operatingInflows._sum.amount || 0) - (operatingOutflows._sum.amount || 0);
-    const netInvestingCashFlow = (investingInflows._sum.amount || 0) - (investingOutflows._sum.amount || 0);
-    const netFinancingCashFlow = (financingInflows._sum.amount || 0) - (financingOutflows._sum.amount || 0);
-    const netCashFlow = netOperatingCashFlow + netInvestingCashFlow + netFinancingCashFlow;
+    const netOperatingCashFlow =
+      (operatingInflows._sum.amount || 0) -
+      (operatingOutflows._sum.amount || 0);
+    const netInvestingCashFlow =
+      (investingInflows._sum.amount || 0) -
+      (investingOutflows._sum.amount || 0);
+    const netFinancingCashFlow =
+      (financingInflows._sum.amount || 0) -
+      (financingOutflows._sum.amount || 0);
+    const netCashFlow =
+      netOperatingCashFlow + netInvestingCashFlow + netFinancingCashFlow;
 
     // Get beginning and ending cash balances
     const beginningCash = await prisma.accountBook.aggregate({
@@ -113,11 +143,27 @@ export async function GET(req) {
         OR: [
           {
             type: 'DEPOSIT',
-            category: { in: ['TITHES', 'OFFERINGS', 'DONATIONS', 'SPECIAL_EVENTS', 'FUNDRAISING'] }
+            category: {
+              in: [
+                'TITHES',
+                'OFFERINGS',
+                'DONATIONS',
+                'SPECIAL_EVENTS',
+                'FUNDRAISING'
+              ]
+            }
           },
           {
             type: 'WITHDRAWAL',
-            category: { in: ['MINISTRY_OPERATIONS', 'ADMINISTRATIVE', 'UTILITIES', 'SALARIES', 'PROGRAMS'] }
+            category: {
+              in: [
+                'MINISTRY_OPERATIONS',
+                'ADMINISTRATIVE',
+                'UTILITIES',
+                'SALARIES',
+                'PROGRAMS'
+              ]
+            }
           }
         ]
       },
@@ -130,17 +176,21 @@ export async function GET(req) {
 
     // Calculate cash flow ratios
     const totalRevenue = operatingInflows._sum.amount || 0;
-    const operatingCashFlowRatio = totalRevenue > 0 ? (netOperatingCashFlow / totalRevenue) * 100 : 0;
-    const cashFlowCoverageRatio = (operatingOutflows._sum.amount || 0) > 0 ? 
-      netOperatingCashFlow / (operatingOutflows._sum.amount || 0) : 0;
+    const operatingCashFlowRatio =
+      totalRevenue > 0 ? (netOperatingCashFlow / totalRevenue) * 100 : 0;
+    const cashFlowCoverageRatio =
+      (operatingOutflows._sum.amount || 0) > 0
+        ? netOperatingCashFlow / (operatingOutflows._sum.amount || 0)
+        : 0;
 
     // Generate cash flow insights
     const insights = [];
-    
+
     if (netOperatingCashFlow < 0) {
       insights.push({
         type: 'WARNING',
-        message: 'Negative operating cash flow - expenses exceed operating income',
+        message:
+          'Negative operating cash flow - expenses exceed operating income',
         impact: 'High'
       });
     }
@@ -156,7 +206,8 @@ export async function GET(req) {
     if (operatingCashFlowRatio < 10) {
       insights.push({
         type: 'INFO',
-        message: 'Low operating cash flow ratio - consider improving operational efficiency',
+        message:
+          'Low operating cash flow ratio - consider improving operational efficiency',
         impact: 'Medium'
       });
     }
@@ -178,41 +229,125 @@ export async function GET(req) {
       endingCash: endingCash._sum.balance || 0,
       operatingActivities: {
         inflows: {
-          tithesOfferings: await getCategoryAmount('TITHES', 'OFFERINGS', startDate, endDate, 'DEPOSIT'),
-          donations: await getCategoryAmount('DONATIONS', null, startDate, endDate, 'DEPOSIT'),
-          specialEvents: await getCategoryAmount('SPECIAL_EVENTS', 'FUNDRAISING', startDate, endDate, 'DEPOSIT'),
+          tithesOfferings: await getCategoryAmount(
+            'TITHES',
+            'OFFERINGS',
+            startDate,
+            endDate,
+            'DEPOSIT'
+          ),
+          donations: await getCategoryAmount(
+            'DONATIONS',
+            null,
+            startDate,
+            endDate,
+            'DEPOSIT'
+          ),
+          specialEvents: await getCategoryAmount(
+            'SPECIAL_EVENTS',
+            'FUNDRAISING',
+            startDate,
+            endDate,
+            'DEPOSIT'
+          ),
           total: operatingInflows._sum.amount || 0
         },
         outflows: {
-          ministryOperations: await getCategoryAmount('MINISTRY_OPERATIONS', 'PROGRAMS', startDate, endDate, 'WITHDRAWAL'),
-          administrative: await getCategoryAmount('ADMINISTRATIVE', 'UTILITIES', startDate, endDate, 'WITHDRAWAL'),
-          salaries: await getCategoryAmount('SALARIES', null, startDate, endDate, 'WITHDRAWAL'),
+          ministryOperations: await getCategoryAmount(
+            'MINISTRY_OPERATIONS',
+            'PROGRAMS',
+            startDate,
+            endDate,
+            'WITHDRAWAL'
+          ),
+          administrative: await getCategoryAmount(
+            'ADMINISTRATIVE',
+            'UTILITIES',
+            startDate,
+            endDate,
+            'WITHDRAWAL'
+          ),
+          salaries: await getCategoryAmount(
+            'SALARIES',
+            null,
+            startDate,
+            endDate,
+            'WITHDRAWAL'
+          ),
           total: operatingOutflows._sum.amount || 0
         },
         netCashFlow: netOperatingCashFlow
       },
       investingActivities: {
         inflows: {
-          investmentReturns: await getCategoryAmount('INVESTMENT_RETURNS', 'INTEREST_INCOME', startDate, endDate, 'DEPOSIT'),
-          assetSales: await getCategoryAmount('ASSET_SALES', null, startDate, endDate, 'DEPOSIT'),
+          investmentReturns: await getCategoryAmount(
+            'INVESTMENT_RETURNS',
+            'INTEREST_INCOME',
+            startDate,
+            endDate,
+            'DEPOSIT'
+          ),
+          assetSales: await getCategoryAmount(
+            'ASSET_SALES',
+            null,
+            startDate,
+            endDate,
+            'DEPOSIT'
+          ),
           total: investingInflows._sum.amount || 0
         },
         outflows: {
-          buildingMaintenance: await getCategoryAmount('BUILDING_MAINTENANCE', 'FACILITY_IMPROVEMENTS', startDate, endDate, 'WITHDRAWAL'),
-          equipmentPurchase: await getCategoryAmount('EQUIPMENT_PURCHASE', 'INVESTMENTS', startDate, endDate, 'WITHDRAWAL'),
+          buildingMaintenance: await getCategoryAmount(
+            'BUILDING_MAINTENANCE',
+            'FACILITY_IMPROVEMENTS',
+            startDate,
+            endDate,
+            'WITHDRAWAL'
+          ),
+          equipmentPurchase: await getCategoryAmount(
+            'EQUIPMENT_PURCHASE',
+            'INVESTMENTS',
+            startDate,
+            endDate,
+            'WITHDRAWAL'
+          ),
           total: investingOutflows._sum.amount || 0
         },
         netCashFlow: netInvestingCashFlow
       },
       financingActivities: {
         inflows: {
-          loansReceived: await getCategoryAmount('LOANS_RECEIVED', 'GRANTS', startDate, endDate, 'DEPOSIT'),
-          capitalContributions: await getCategoryAmount('CAPITAL_CONTRIBUTIONS', null, startDate, endDate, 'DEPOSIT'),
+          loansReceived: await getCategoryAmount(
+            'LOANS_RECEIVED',
+            'GRANTS',
+            startDate,
+            endDate,
+            'DEPOSIT'
+          ),
+          capitalContributions: await getCategoryAmount(
+            'CAPITAL_CONTRIBUTIONS',
+            null,
+            startDate,
+            endDate,
+            'DEPOSIT'
+          ),
           total: financingInflows._sum.amount || 0
         },
         outflows: {
-          loanPayments: await getCategoryAmount('LOAN_PAYMENTS', 'DEBT_PAYMENT', startDate, endDate, 'WITHDRAWAL'),
-          dividends: await getCategoryAmount('DIVIDENDS', null, startDate, endDate, 'WITHDRAWAL'),
+          loanPayments: await getCategoryAmount(
+            'LOAN_PAYMENTS',
+            'DEBT_PAYMENT',
+            startDate,
+            endDate,
+            'WITHDRAWAL'
+          ),
+          dividends: await getCategoryAmount(
+            'DIVIDENDS',
+            null,
+            startDate,
+            endDate,
+            'WITHDRAWAL'
+          ),
           total: financingOutflows._sum.amount || 0
         },
         netCashFlow: netFinancingCashFlow
@@ -229,17 +364,25 @@ export async function GET(req) {
     };
 
     return NextResponse.json(cashFlowStatement);
-
   } catch (error) {
-    console.error('Cash flow analysis error:', error);
-    return NextResponse.json({ error: 'Failed to generate cash flow statement' }, { status: 500 });
+    // console.error('Cash flow analysis error:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate cash flow statement' },
+      { status: 500 }
+    );
   }
 }
 
-async function getCategoryAmount(category1, category2, startDate, endDate, type) {
+async function getCategoryAmount(
+  category1,
+  category2,
+  startDate,
+  endDate,
+  type
+) {
   const categories = [category1];
   if (category2) categories.push(category2);
-  
+
   const result = await prisma.transaction.aggregate({
     where: {
       type,
@@ -248,6 +391,6 @@ async function getCategoryAmount(category1, category2, startDate, endDate, type)
     },
     _sum: { amount: true }
   });
-  
+
   return result._sum.amount || 0;
 }

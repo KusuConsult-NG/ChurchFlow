@@ -1,13 +1,14 @@
+import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+
 import { authOptions } from '../../../../../lib/auth';
-import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export async function POST(req, { params }) {
   try {
-    const session = await getServerSession(authOptions);
+    const _session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -23,18 +24,27 @@ export async function POST(req, { params }) {
       where: { id },
       include: {
         workflow: true,
-        requestedByUser: { select: { name: true, email: true } },
-      },
+        requestedByUser: { select: { name: true, email: true } }
+      }
     });
 
     if (!approvalRequest) {
-      return NextResponse.json({ error: 'Approval request not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Approval request not found' },
+        { status: 404 }
+      );
     }
 
     // Check if user has permission to approve/reject
-    const hasPermission = await checkApprovalPermission(session.user, approvalRequest);
+    const hasPermission = await checkApprovalPermission(
+      session.user,
+      approvalRequest
+    );
     if (!hasPermission) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Insufficient permissions' },
+        { status: 403 }
+      );
     }
 
     // Update approval request
@@ -44,8 +54,8 @@ export async function POST(req, { params }) {
         status: action === 'approve' ? 'APPROVED' : 'REJECTED',
         approvedBy: session.user.id,
         approvedAt: new Date(),
-        comments: action === 'reject' ? 'Request rejected' : 'Request approved',
-      },
+        comments: action === 'reject' ? 'Request rejected' : 'Request approved'
+      }
     });
 
     // If approved, trigger any follow-up actions
@@ -56,33 +66,37 @@ export async function POST(req, { params }) {
     // Create audit log
     await prisma.auditLog.create({
       data: {
-        action: action === 'approve' ? 'APPROVAL_APPROVED' : 'APPROVAL_REJECTED',
+        action:
+          action === 'approve' ? 'APPROVAL_APPROVED' : 'APPROVAL_REJECTED',
         entityType: 'APPROVAL_REQUEST',
         entityId: id,
         userId: session.user.id,
         details: {
           action,
           originalStatus: approvalRequest.status,
-          newStatus: updatedRequest.status,
-        },
-      },
+          newStatus: updatedRequest.status
+        }
+      }
     });
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       message: `Request ${action}d successfully`,
       approval: updatedRequest
     });
   } catch (error) {
-    console.error('Approval action error:', error);
-    return NextResponse.json({ error: 'Failed to process approval' }, { status: 500 });
+    // console.error('Approval action error:', error);
+    return NextResponse.json(
+      { error: 'Failed to process approval' },
+      { status: 500 }
+    );
   }
 }
 
 async function checkApprovalPermission(user, approvalRequest) {
   // Check if user has permission based on their role and the approval level
   const userRole = user.role;
-  const approvalLevel = approvalRequest.approvalLevel;
+  const _approvalLevel = approvalRequest.approvalLevel;
 
   // Basic role-based permission check
   const allowedRoles = ['ADMIN', 'GCC', 'DCC', 'AGENCY_LEADER', 'LCC'];
@@ -91,15 +105,21 @@ async function checkApprovalPermission(user, approvalRequest) {
   }
 
   // Additional checks based on organizational hierarchy
-  if (userRole === 'AGENCY_LEADER' && approvalRequest.agencyId !== user.agencyId) {
+  if (
+    userRole === 'AGENCY_LEADER' &&
+    approvalRequest.agencyId !== user.agencyId
+  ) {
     return false;
   }
-  
+
   if (userRole === 'DCC' && approvalRequest.districtId !== user.districtId) {
     return false;
   }
-  
-  if (userRole === 'LCC' && approvalRequest.subDistrictId !== user.subDistrictId) {
+
+  if (
+    userRole === 'LCC' &&
+    approvalRequest.subDistrictId !== user.subDistrictId
+  ) {
     return false;
   }
 
@@ -113,17 +133,17 @@ async function handleApprovedRequest(approvalRequest) {
       // Update requisition status
       await prisma.requisition.update({
         where: { id: approvalRequest.entityId },
-        data: { status: 'APPROVED' },
+        data: { status: 'APPROVED' }
       });
     } else if (approvalRequest.type === 'FUND_TRANSFER') {
       // Process fund transfer
       await prisma.fundTransfer.update({
         where: { id: approvalRequest.entityId },
-        data: { status: 'APPROVED' },
+        data: { status: 'APPROVED' }
       });
     }
     // Add more approval types as needed
   } catch (error) {
-    console.error('Error handling approved request:', error);
+    // console.error('Error handling approved request:', error);
   }
 }

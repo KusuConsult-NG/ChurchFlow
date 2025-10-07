@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Production builds
+.next/
+out/
+build/
+dist/
+
+# Environment files
+.env*
+
+# Logs
+*.log
+
+# Database files
+*.db
+*.sqlite
+
+# Generated files
+prisma/generated/
+
+# Package manager files
+package-lock.json
+yarn.lock
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+
+# YAML files
+*.yml
+*.yaml
+
+# GitHub workflows
+.github/

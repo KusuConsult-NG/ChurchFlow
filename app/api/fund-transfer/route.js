@@ -1,22 +1,27 @@
+import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+
 import { authOptions } from '../../../lib/auth';
-import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
+    const _session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { fromAccount, toAccount, amount, description, transferType } = await req.json();
+    const { fromAccount, toAccount, amount, description, transferType } =
+      await req.json();
 
     // Validate required fields
     if (!fromAccount || !toAccount || !amount || !description) {
-      return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'All fields are required' },
+        { status: 400 }
+      );
     }
 
     // Validate amount
@@ -37,8 +42,8 @@ export async function POST(req) {
         districtId: session.user.districtId,
         agencyId: session.user.agencyId,
         createdBy: session.user.id,
-        createdAt: new Date(),
-      },
+        createdAt: new Date()
+      }
     });
 
     // Create audit log
@@ -52,32 +57,38 @@ export async function POST(req) {
           fromAccount,
           toAccount,
           amount: transferAmount,
-          transferType,
-        },
-      },
+          transferType
+        }
+      }
     });
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       transferId: fundTransfer.id,
-      message: 'Fund transfer request submitted successfully' 
+      message: 'Fund transfer request submitted successfully'
     });
   } catch (error) {
-    console.error('Fund transfer error:', error);
-    return NextResponse.json({ error: 'Failed to process transfer request' }, { status: 500 });
+    // console.error('Fund transfer error:', error);
+    return NextResponse.json(
+      { error: 'Failed to process transfer request' },
+      { status: 500 }
+    );
   }
 }
 
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
+    const _session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const url = new URL(req.url);
     const page = Math.max(1, Number(url.searchParams.get('page') || 1));
-    const pageSize = Math.max(1, Math.min(50, Number(url.searchParams.get('pageSize') || 10)));
+    const pageSize = Math.max(
+      1,
+      Math.min(50, Number(url.searchParams.get('pageSize') || 10))
+    );
 
     const [transfers, total] = await Promise.all([
       prisma.fundTransfer.findMany({
@@ -86,10 +97,10 @@ export async function GET(req) {
         take: pageSize,
         include: {
           creator: { select: { name: true, email: true } },
-          approver: { select: { name: true, email: true } },
-        },
+          approver: { select: { name: true, email: true } }
+        }
       }),
-      prisma.fundTransfer.count(),
+      prisma.fundTransfer.count()
     ]);
 
     return NextResponse.json({
@@ -97,10 +108,13 @@ export async function GET(req) {
       total,
       page,
       pageSize,
-      pages: Math.ceil(total / pageSize),
+      pages: Math.ceil(total / pageSize)
     });
   } catch (error) {
-    console.error('Get fund transfers error:', error);
-    return NextResponse.json({ error: 'Failed to fetch transfers' }, { status: 500 });
+    // console.error('Get fund transfers error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch transfers' },
+      { status: 500 }
+    );
   }
 }

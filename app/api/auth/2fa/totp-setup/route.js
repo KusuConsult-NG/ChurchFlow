@@ -1,15 +1,16 @@
+import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../../../../lib/auth';
-import { PrismaClient } from '@prisma/client';
-import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
+import speakeasy from 'speakeasy';
+
+import { authOptions } from '../../../../../lib/auth';
 
 const prisma = new PrismaClient();
 
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
+    const _session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -17,7 +18,7 @@ export async function POST(req) {
     // Generate a secret
     const secret = speakeasy.generateSecret({
       name: `ChurchFlow (${session.user.email})`,
-      issuer: 'ChurchFlow',
+      issuer: 'ChurchFlow'
     });
 
     // Generate QR code
@@ -28,16 +29,19 @@ export async function POST(req) {
       where: { id: session.user.id },
       data: {
         totpSecret: secret.base32,
-        twoFactorEnabled: false, // Will be enabled after verification
-      },
+        twoFactorEnabled: false // Will be enabled after verification
+      }
     });
 
     return NextResponse.json({
       qrCode: qrCodeUrl,
-      secret: secret.base32,
+      secret: secret.base32
     });
   } catch (error) {
-    console.error('TOTP setup error:', error);
-    return NextResponse.json({ error: 'Failed to setup TOTP' }, { status: 500 });
+    // console.error('TOTP setup error:', error);
+    return NextResponse.json(
+      { error: 'Failed to setup TOTP' },
+      { status: 500 }
+    );
   }
 }

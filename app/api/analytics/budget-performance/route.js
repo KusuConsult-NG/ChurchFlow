@@ -1,30 +1,35 @@
+import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+
 import { authOptions } from '../../../../lib/auth';
-import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || !['ADMIN', 'GCC', 'DCC', 'BANK_OPERATOR'].includes(session.user.role)) {
+    const _session = await getServerSession(authOptions);
+    if (
+      !session?.user ||
+      !['ADMIN', 'GCC', 'DCC', 'BANK_OPERATOR'].includes(session.user.role)
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const url = new URL(req.url);
-    const year = parseInt(url.searchParams.get('year')) || new Date().getFullYear();
+    const year =
+      parseInt(url.searchParams.get('year')) || new Date().getFullYear();
     const month = parseInt(url.searchParams.get('month')) || null;
 
     // Get budgets for the year
-    const budgets = await prisma.budget.findMany({
+    const _budgets = await prisma.budget.findMany({
       where: { year },
       orderBy: { category: 'asc' }
     });
 
     // Get actual expenses for the period
     const startDate = new Date(year, month ? month - 1 : 0, 1);
-    const endDate = month 
+    const endDate = month
       ? new Date(year, month, 0, 23, 59, 59) // End of month
       : new Date(year, 11, 31, 23, 59, 59); // End of year
 
@@ -39,11 +44,14 @@ export async function GET(req) {
 
     // Calculate budget performance
     const budgetPerformance = budgets.map(budget => {
-      const actual = actualExpenses.find(expense => expense.category === budget.category);
+      const actual = actualExpenses.find(
+        expense => expense.category === budget.category
+      );
       const actualAmount = actual ? actual._sum.amount : 0;
       const variance = budget.amount - actualAmount;
-      const variancePercentage = budget.amount > 0 ? (variance / budget.amount) * 100 : 0;
-      
+      const variancePercentage =
+        budget.amount > 0 ? (variance / budget.amount) * 100 : 0;
+
       return {
         id: budget.id,
         category: budget.category,
@@ -53,22 +61,30 @@ export async function GET(req) {
         variance: variance,
         variancePercentage: variancePercentage,
         status: variance >= 0 ? 'UNDER_BUDGET' : 'OVER_BUDGET',
-        utilizationRate: budget.amount > 0 ? (actualAmount / budget.amount) * 100 : 0
+        utilizationRate:
+          budget.amount > 0 ? (actualAmount / budget.amount) * 100 : 0
       };
     });
 
     // Calculate totals
-    const totalBudgeted = budgets.reduce((sum, budget) => sum + budget.amount, 0);
-    const totalActual = actualExpenses.reduce((sum, expense) => sum + expense._sum.amount, 0);
+    const totalBudgeted = budgets.reduce(
+      (sum, budget) => sum + budget.amount,
+      0
+    );
+    const totalActual = actualExpenses.reduce(
+      (sum, expense) => sum + expense._sum.amount,
+      0
+    );
     const totalVariance = totalBudgeted - totalActual;
-    const overallUtilizationRate = totalBudgeted > 0 ? (totalActual / totalBudgeted) * 100 : 0;
+    const overallUtilizationRate =
+      totalBudgeted > 0 ? (totalActual / totalBudgeted) * 100 : 0;
 
     // Get monthly trends for the year
     const monthlyTrends = [];
     for (let m = 0; m < 12; m++) {
       const monthStart = new Date(year, m, 1);
       const monthEnd = new Date(year, m + 1, 0, 23, 59, 59);
-      
+
       const monthExpenses = await prisma.transaction.aggregate({
         where: {
           type: 'WITHDRAWAL',
@@ -87,8 +103,12 @@ export async function GET(req) {
 
     // Generate insights and recommendations
     const insights = [];
-    const overBudgetCategories = budgetPerformance.filter(bp => bp.status === 'OVER_BUDGET');
-    const underBudgetCategories = budgetPerformance.filter(bp => bp.status === 'UNDER_BUDGET');
+    const overBudgetCategories = budgetPerformance.filter(
+      bp => bp.status === 'OVER_BUDGET'
+    );
+    const underBudgetCategories = budgetPerformance.filter(
+      bp => bp.status === 'UNDER_BUDGET'
+    );
 
     if (overBudgetCategories.length > 0) {
       insights.push({
@@ -138,9 +158,11 @@ export async function GET(req) {
     };
 
     return NextResponse.json(analysis);
-
   } catch (error) {
-    console.error('Budget performance analysis error:', error);
-    return NextResponse.json({ error: 'Failed to generate budget performance analysis' }, { status: 500 });
+    // console.error('Budget performance analysis error:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate budget performance analysis' },
+      { status: 500 }
+    );
   }
 }

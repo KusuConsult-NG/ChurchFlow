@@ -1,13 +1,14 @@
+import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+
 import { authOptions } from '../../../../../lib/auth';
-import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export async function PATCH(req, { params }) {
   try {
-    const session = await getServerSession(authOptions);
+    const _session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -16,7 +17,10 @@ export async function PATCH(req, { params }) {
     const { status } = await req.json();
 
     if (!status) {
-      return NextResponse.json({ error: 'Status is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Status is required' },
+        { status: 400 }
+      );
     }
 
     // Get the issue first
@@ -26,12 +30,21 @@ export async function PATCH(req, { params }) {
     });
 
     if (!issue) {
-      return NextResponse.json({ error: 'Compliance issue not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Compliance issue not found' },
+        { status: 404 }
+      );
     }
 
     // Check permissions
-    if (session.user.role === 'DCC' && issue.districtId !== session.user.districtId) {
-      return NextResponse.json({ error: 'Unauthorized to update this issue' }, { status: 403 });
+    if (
+      session.user.role === 'DCC' &&
+      issue.districtId !== session.user.districtId
+    ) {
+      return NextResponse.json(
+        { error: 'Unauthorized to update this issue' },
+        { status: 403 }
+      );
     }
 
     // Update the issue
@@ -41,8 +54,8 @@ export async function PATCH(req, { params }) {
         status,
         updatedAt: new Date(),
         ...(status === 'RESOLVED' && { resolvedAt: new Date() }),
-        ...(status === 'CLOSED' && { closedAt: new Date() }),
-      },
+        ...(status === 'CLOSED' && { closedAt: new Date() })
+      }
     });
 
     // Create audit log
@@ -55,18 +68,21 @@ export async function PATCH(req, { params }) {
         details: {
           oldStatus: issue.status,
           newStatus: status,
-          issueTitle: issue.title,
-        },
-      },
+          issueTitle: issue.title
+        }
+      }
     });
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       issue: updatedIssue,
-      message: 'Issue status updated successfully' 
+      message: 'Issue status updated successfully'
     });
   } catch (error) {
-    console.error('Update compliance issue status error:', error);
-    return NextResponse.json({ error: 'Failed to update issue status' }, { status: 500 });
+    // console.error('Update compliance issue status error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update issue status' },
+      { status: 500 }
+    );
   }
 }

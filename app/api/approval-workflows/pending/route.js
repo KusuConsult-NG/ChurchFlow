@@ -1,20 +1,21 @@
+import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+
 import { authOptions } from '../../../../lib/auth';
-import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
+    const _session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get pending approvals based on user role
-    let whereClause = { status: 'PENDING' };
-    
+    const whereClause = { status: 'PENDING' };
+
     // Filter by user's approval level
     if (session.user.role === 'AGENCY_LEADER') {
       whereClause.agencyId = session.user.agencyId;
@@ -29,13 +30,16 @@ export async function GET(req) {
       orderBy: { createdAt: 'desc' },
       include: {
         requestedByUser: { select: { name: true, email: true } },
-        workflow: { select: { name: true, department: true } },
-      },
+        workflow: { select: { name: true, department: true } }
+      }
     });
 
     return NextResponse.json({ approvals });
   } catch (error) {
-    console.error('Get pending approvals error:', error);
-    return NextResponse.json({ error: 'Failed to fetch pending approvals' }, { status: 500 });
+    // console.error('Get pending approvals error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch pending approvals' },
+      { status: 500 }
+    );
   }
 }

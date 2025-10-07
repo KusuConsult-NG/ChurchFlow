@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { rateLimit } from './lib/api-utils';
+
+import { rateLimit, apiProtection } from './lib/rate-limiting';
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
-  
+
   // Skip middleware for static files and health checks
   if (
     pathname.startsWith('/_next/') ||
@@ -14,45 +15,93 @@ export function middleware(request) {
     return NextResponse.next();
   }
 
-  // Apply rate limiting to API routes
-  if (pathname.startsWith('/api/')) {
-    const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
-    const identifier = `${ip}-${pathname}`;
-    
-    if (!rateLimit(identifier, 100, 15 * 60 * 1000)) { // 100 requests per 15 minutes
-      return NextResponse.json(
-        { 
-          error: 'Too many requests',
-          message: 'Rate limit exceeded. Please try again later.',
-          retryAfter: 900 // 15 minutes in seconds
-        },
-        { 
+  // Apply rate limiting to API routes (disabled for development)
+  if (pathname.startsWith('/api/') && process.env.NODE_ENV === 'production') {
+    // Determine rate limit config based on endpoint
+    let configName = 'api';
+    if (pathname.includes('/auth/')) {
+      configName = 'auth';
+    } else if (pathname.includes('/upload')) {
+      configName = 'upload';
+    } else if (pathname.includes('/password-reset')) {
+      configName = 'passwordReset';
+    }
+
+    const clientId = rateLimit.getClientId(request);
+    const key = `${configName}:${clientId}`;
+    const config = rateLimit.configs[configName];
+
+    const result = rateLimit.checkLimit(key, config);
+
+    if (!result.allowed) {
+      return new NextResponse(
+        JSON.stringify({
+          error: config.message,
+          retryAfter: Math.ceil((result.resetTime - Date.now()) / 1000)
+        }),
+        {
           status: 429,
           headers: {
-            'Retry-After': '900',
-            'X-RateLimit-Limit': '100',
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': new Date(Date.now() + 15 * 60 * 1000).toISOString()
+            'Content-Type': 'application/json',
+            'Retry-After': Math.ceil(
+              (result.resetTime - Date.now()) / 1000
+            ).toString(),
+            'X-RateLimit-Limit': config.max.toString(),
+            'X-RateLimit-Remaining': result.remaining.toString(),
+            'X-RateLimit-Reset': result.resetTime.toString()
           }
         }
       );
+    }
+
+    // Validate request origin
+    if (!apiProtection.validateOrigin(request)) {
+      return new NextResponse(JSON.stringify({ error: 'Invalid origin' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Validate request size
+    if (!apiProtection.validateRequestSize(request)) {
+      return new NextResponse(JSON.stringify({ error: 'Request too large' }), {
+        status: 413,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
   }
 
   // Add security headers
   const response = NextResponse.next();
-  
-  // Security headers
+
+  // Enhanced security headers
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('Referrer-Policy', 'origin-when-cross-origin');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-XSS-Protection', '1; mode=block');
-  
+  response.headers.set(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=()'
+  );
+  response.headers.set(
+    'Strict-Transport-Security',
+    'max-age=31536000; includeSubDomains'
+  );
+
   // CORS headers for API routes
   if (pathname.startsWith('/api/')) {
-    response.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGINS || '*');
-    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    response.headers.set(
+      'Access-Control-Allow-Origin',
+      process.env.ALLOWED_ORIGINS || '*'
+    );
+    response.headers.set(
+      'Access-Control-Allow-Methods',
+      'GET, POST, PUT, DELETE, OPTIONS'
+    );
+    response.headers.set(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization'
+    );
     response.headers.set('Access-Control-Max-Age', '86400');
   }
 
@@ -67,6 +116,6 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
-  ],
+    '/((?!_next/static|_next/image|favicon.ico).*)'
+  ]
 };

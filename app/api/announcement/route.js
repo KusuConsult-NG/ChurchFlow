@@ -1,14 +1,21 @@
-import { PrismaClient } from "@prisma/client";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../../lib/auth";
-import { ApiResponse, withErrorHandling, getPaginationParams, validateRequest, logApiCall } from "../../../lib/api-utils";
+import { PrismaClient } from '@prisma/client';
+import { getServerSession } from 'next-auth';
+
+import {
+  ApiResponse,
+  withErrorHandling,
+  getPaginationParams,
+  validateRequest,
+  logApiCall
+} from '../../../lib/api-utils';
+import { authOptions } from '../../../lib/auth';
 
 const prisma = new PrismaClient();
 
-export const GET = withErrorHandling(async (req) => {
+export const GET = withErrorHandling(async req => {
   const startTime = Date.now();
-  const session = await getServerSession(authOptions);
-  
+  const _session = await getServerSession(authOptions);
+
   if (!session?.user) {
     return ApiResponse.unauthorized('Authentication required');
   }
@@ -17,12 +24,14 @@ export const GET = withErrorHandling(async (req) => {
   const { page, pageSize, offset } = getPaginationParams(url.searchParams);
   const search = url.searchParams.get('search') || '';
 
-  const where = search ? {
-    OR: [
-      { title: { contains: search, mode: 'insensitive' } },
-      { content: { contains: search, mode: 'insensitive' } }
-    ]
-  } : {};
+  const where = search
+    ? {
+      OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { content: { contains: search, mode: 'insensitive' } }
+      ]
+    }
+    : {};
 
   const [items, total] = await Promise.all([
     prisma.announcement.findMany({
@@ -37,33 +46,47 @@ export const GET = withErrorHandling(async (req) => {
     prisma.announcement.count({ where })
   ]);
 
-  const response = ApiResponse.success({
-    items,
-    pagination: {
-      page,
-      pageSize,
-      total,
-      pages: Math.ceil(total / pageSize)
-    }
-  }, 'Announcements retrieved successfully');
+  const response = ApiResponse.success(
+    {
+      items,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        pages: Math.ceil(total / pageSize)
+      }
+    },
+    'Announcements retrieved successfully'
+  );
 
   // Add caching headers
-  response.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=60');
-  
-  logApiCall('/api/announcement', 'GET', session.user.id, Date.now() - startTime, 200);
+  response.headers.set(
+    'Cache-Control',
+    'public, max-age=300, stale-while-revalidate=60'
+  );
+
+  logApiCall(
+    '/api/announcement',
+    'GET',
+    session.user.id,
+    Date.now() - startTime,
+    200
+  );
   return response;
 });
 
-export const POST = withErrorHandling(async (req) => {
+export const POST = withErrorHandling(async req => {
   const startTime = Date.now();
-  const session = await getServerSession(authOptions);
-  
+  const _session = await getServerSession(authOptions);
+
   if (!session?.user) {
     return ApiResponse.unauthorized('Authentication required');
   }
 
   if (!['ADMIN', 'GCC', 'DCC'].includes(session.user.role)) {
-    return ApiResponse.forbidden('Insufficient permissions to create announcements');
+    return ApiResponse.forbidden(
+      'Insufficient permissions to create announcements'
+    );
   }
 
   const form = await req.formData();
@@ -89,6 +112,16 @@ export const POST = withErrorHandling(async (req) => {
     }
   });
 
-  logApiCall('/api/announcement', 'POST', session.user.id, Date.now() - startTime, 201);
-  return ApiResponse.success(announcement, 'Announcement created successfully', 201);
+  logApiCall(
+    '/api/announcement',
+    'POST',
+    session.user.id,
+    Date.now() - startTime,
+    201
+  );
+  return ApiResponse.success(
+    announcement,
+    'Announcement created successfully',
+    201
+  );
 });

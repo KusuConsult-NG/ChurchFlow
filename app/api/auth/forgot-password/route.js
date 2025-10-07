@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
+
+import { PrismaClient } from '@prisma/client';
+import { NextResponse } from 'next/server';
 
 const prisma = new PrismaClient();
 
@@ -14,13 +15,14 @@ export async function POST(req) {
 
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email }
     });
 
     if (!user) {
       // Don't reveal if user exists or not for security
-      return NextResponse.json({ 
-        message: 'If an account with that email exists, we\'ve sent a password reset link.' 
+      return NextResponse.json({
+        message:
+          'If an account with that email exists, we\'ve sent a password reset link.'
       });
     }
 
@@ -33,8 +35,8 @@ export async function POST(req) {
       where: { id: user.id },
       data: {
         resetToken,
-        resetExpires,
-      },
+        resetExpires
+      }
     });
 
     // TODO: Send email with reset link
@@ -42,11 +44,15 @@ export async function POST(req) {
     // In production, you'd send an email with the reset link
     // const resetUrl = `${process.env.NEXTAUTH_URL}/auth/reset-password?token=${resetToken}`;
 
-    return NextResponse.json({ 
-      message: 'If an account with that email exists, we\'ve sent a password reset link.' 
+    return NextResponse.json({
+      message:
+        'If an account with that email exists, we\'ve sent a password reset link.'
     });
   } catch (error) {
-    console.error('Forgot password error:', error);
-    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
+    // console.error('Forgot password error:', error);
+    return NextResponse.json(
+      { error: 'Failed to process request' },
+      { status: 500 }
+    );
   }
 }

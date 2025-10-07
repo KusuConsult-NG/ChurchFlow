@@ -1,13 +1,14 @@
+import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+
 import { authOptions } from '../../../../lib/auth';
-import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
+    const _session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -15,7 +16,10 @@ export async function POST(req) {
     const { accountId, startDate, endDate } = await req.json();
 
     if (!accountId || !startDate || !endDate) {
-      return NextResponse.json({ error: 'Account ID, start date, and end date are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Account ID, start date, and end date are required' },
+        { status: 400 }
+      );
     }
 
     // Get account information
@@ -28,8 +32,12 @@ export async function POST(req) {
     }
 
     // Generate statement data
-    const statementData = await generateStatementData(accountId, startDate, endDate);
-    
+    const _statementData = await generateStatementData(
+      accountId,
+      startDate,
+      endDate
+    );
+
     // Create statement record
     const statement = await prisma.accountStatement.create({
       data: {
@@ -39,19 +47,19 @@ export async function POST(req) {
         status: 'COMPLETED',
         generatedBy: session.user.id,
         createdAt: new Date(),
-        completedAt: new Date(),
-      },
+        completedAt: new Date()
+      }
     });
 
     // Generate PDF (simplified - in production you'd use a PDF library)
     const fileContent = await generateStatementPDF(statementData);
-    
+
     // Update statement with file path
     await prisma.accountStatement.update({
       where: { id: statement.id },
       data: {
-        filePath: `/statements/${statement.id}.pdf`,
-      },
+        filePath: `/statements/${statement.id}.pdf`
+      }
     });
 
     // Create audit log
@@ -64,21 +72,24 @@ export async function POST(req) {
         details: {
           accountId,
           startDate,
-          endDate,
-        },
-      },
+          endDate
+        }
+      }
     });
 
     // Return file as response
     return new NextResponse(fileContent, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="account-statement-${accountId}-${startDate}-${endDate}.pdf"`,
-      },
+        'Content-Disposition': `attachment; filename="account-statement-${accountId}-${startDate}-${endDate}.pdf"`
+      }
     });
   } catch (error) {
-    console.error('Generate account statement error:', error);
-    return NextResponse.json({ error: 'Failed to generate account statement' }, { status: 500 });
+    // console.error('Generate account statement error:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate account statement' },
+      { status: 500 }
+    );
   }
 }
 
@@ -106,7 +117,7 @@ async function generateStatementData(accountId, startDate, endDate) {
   const totalDeposits = account.transactions
     .filter(t => t.type === 'DEPOSIT')
     .reduce((sum, t) => sum + t.amount, 0);
-  
+
   const totalWithdrawals = account.transactions
     .filter(t => t.type === 'WITHDRAWAL')
     .reduce((sum, t) => sum + t.amount, 0);
@@ -129,9 +140,9 @@ async function generateStatementData(accountId, startDate, endDate) {
 async function generateStatementPDF(statementData) {
   // This is a simplified version - in production you'd use a PDF library like Puppeteer or jsPDF
   // For now, we'll return a simple text representation
-  
+
   const { account, period, summary, transactions } = statementData;
-  
+
   const content = `
 ACCOUNT STATEMENT
 =================
@@ -148,12 +159,15 @@ Transaction Count: ${summary.transactionCount}
 
 TRANSACTIONS
 ------------
-${transactions.map(t => 
-  `${t.createdAt.toLocaleDateString()} | ${t.type} | $${t.amount} | ${t.description || 'No description'}`
-).join('\n')}
+${transactions
+    .map(
+      t =>
+        `${t.createdAt.toLocaleDateString()} | ${t.type} | $${t.amount} | ${t.description || 'No description'}`
+    )
+    .join('\n')}
 
 Generated on: ${new Date().toLocaleString()}
   `;
-  
+
   return Buffer.from(content);
 }

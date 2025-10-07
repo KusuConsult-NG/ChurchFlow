@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
   // Create a test admin user
   const hashedPassword = await bcrypt.hash('password123', 12);
-  
+
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@churchflow.com' },
     update: {},
@@ -14,8 +14,8 @@ async function main() {
       name: 'Admin User',
       email: 'admin@churchflow.com',
       password: hashedPassword,
-      role: 'ADMIN',
-    },
+      role: 'ADMIN'
+    }
   });
 
   // Create a test member user
@@ -26,8 +26,8 @@ async function main() {
       name: 'John Member',
       email: 'member@churchflow.com',
       password: hashedPassword,
-      role: 'MEMBER',
-    },
+      role: 'MEMBER'
+    }
   });
 
   console.log('Admin user created:', adminUser);
@@ -35,7 +35,7 @@ async function main() {
 }
 
 main()
-  .catch((e) => {
+  .catch(e => {
     console.error(e);
     process.exit(1);
   })

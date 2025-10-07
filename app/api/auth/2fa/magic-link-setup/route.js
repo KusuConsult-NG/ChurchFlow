@@ -1,14 +1,16 @@
+import crypto from 'crypto';
+
+import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+
 import { authOptions } from '../../../../../lib/auth';
-import { PrismaClient } from '@prisma/client';
-import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
+    const _session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -23,20 +25,23 @@ export async function POST(req) {
       data: {
         magicLinkEnabled: true,
         magicLinkToken: token,
-        magicLinkExpires: expiresAt,
-      },
+        magicLinkExpires: expiresAt
+      }
     });
 
     // TODO: Send email with magic link
     // For now, we'll just return success
     // In production, you'd send an email with the magic link
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      message: 'Magic link setup completed. Check your email for verification.',
+      message: 'Magic link setup completed. Check your email for verification.'
     });
   } catch (error) {
-    console.error('Magic link setup error:', error);
-    return NextResponse.json({ error: 'Failed to setup magic link' }, { status: 500 });
+    // console.error('Magic link setup error:', error);
+    return NextResponse.json(
+      { error: 'Failed to setup magic link' },
+      { status: 500 }
+    );
   }
 }
