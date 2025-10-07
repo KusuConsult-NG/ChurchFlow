@@ -16,7 +16,9 @@
     "permissions:fix": "./fix-permissions.sh set",
     "test:services": "node test-external-services.js",
     "test:api": "node test-api-endpoints.js",
-    "test:all": "npm run env:validate && npm run test:services && npm run test:api"
+    "test:all": "npm run env:validate && npm run test:services && npm run test:api",
+    "vercel-build": "prisma generate && next build",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "node ./prisma/seed.js"
