@@ -32,8 +32,14 @@ export async function GET() {
       isConfigured: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
     };
 
+    // Check if all required environment variables are set
+    const isFullyConfigured = envCheck.NEXTAUTH_URL === 'SET' && 
+                             envCheck.NEXTAUTH_SECRET === 'SET' && 
+                             envCheck.GOOGLE_CLIENT_ID === 'SET' && 
+                             envCheck.GOOGLE_CLIENT_SECRET === 'SET';
+
     return NextResponse.json({
-      status: 'ok',
+      status: isFullyConfigured ? 'ok' : 'error',
       timestamp: new Date().toISOString(),
       environment: envCheck,
       googleOAuth: googleConfig,
@@ -46,11 +52,17 @@ export async function GET() {
         signIn: '/api/auth/signin',
         callback: '/api/auth/callback/google',
         error: '/auth/error'
+      },
+      troubleshooting: {
+        message: isFullyConfigured ? 'Configuration looks good' : 'Missing required environment variables',
+        nextSteps: isFullyConfigured ? 
+          'Try signing in with Google again' : 
+          'Please set all required environment variables in Vercel'
       }
     });
 
   } catch (error) {
-    console.error('Debug API error:', error);
+    console.error('Debug OAuth API error:', error);
     return NextResponse.json({
       status: 'error',
       error: error.message,
