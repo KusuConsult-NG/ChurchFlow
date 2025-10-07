@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import { NextResponse } from 'next/server';
 
-const prisma = new PrismaClient();
+// Simple in-memory user storage (in production, use a database)
+const users = new Map();
 
 // Simple signup schema validation
 function validateSignupData(data) {
@@ -47,17 +46,7 @@ export async function POST(req) {
     const { email, password, fullName, role = 'MEMBER' } = body;
 
     // Check if user already exists
-    let existingUser = null;
-    try {
-      existingUser = await prisma.user.findUnique({
-        where: { email }
-      });
-    } catch (dbError) {
-      console.log('⚠️ Database connection issue, using fallback check');
-      // For now, we'll proceed without database check
-    }
-
-    if (existingUser) {
+    if (users.has(email)) {
       console.log('❌ User already exists:', email);
       return NextResponse.json({ 
         success: false, 
@@ -65,39 +54,23 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
-    console.log('✅ Password hashed successfully');
+    // Create user
+    const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const user = {
+      id: userId,
+      email: email,
+      name: fullName,
+      role: role,
+      password: password, // In production, hash this password
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-    // Create user (try database first, fallback to in-memory)
-    let user = null;
-    try {
-      user = await prisma.user.create({
-        data: {
-          email,
-          name: fullName,
-          password: hashedPassword,
-          role: role,
-          emailVerified: null
-        }
-      });
-      console.log('✅ User created in database:', user.id);
-    } catch (dbError) {
-      console.log('⚠️ Database creation failed, using fallback user creation');
-      
-      // Fallback: Create a temporary user object
-      user = {
-        id: `temp_${Date.now()}`,
-        email,
-        name: fullName,
-        role: role,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      console.log('✅ Fallback user created:', user.id);
-    }
+    // Store user in memory
+    users.set(email, user);
+    console.log('✅ User created:', user.id);
 
-    // Generate a simple JWT-like token (in production, use proper JWT)
+    // Generate a simple token
     const token = Buffer.from(JSON.stringify({
       userId: user.id,
       email: user.email,
