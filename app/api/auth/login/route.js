@@ -1,24 +1,58 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import { NextResponse } from 'next/server';
 
+import { 
+  PasswordHasher, 
+  JWTManager, 
+  ValidationSchemas,
+  RateLimiter 
+} from '../../../../lib/security';
+
 const prisma = new PrismaClient();
+const rateLimiter = new RateLimiter();
 
 export async function POST(req) {
   try {
     console.log('🔍 Login request received');
     
     const body = await req.json();
-    console.log('🔍 Login data:', { email: body.email });
+    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
     
-    const { email, password } = body;
-
-    if (!email || !password) {
+    // Rate limiting check
+    if (rateLimiter.isRateLimited(clientIP)) {
+      const remainingTime = rateLimiter.getRemainingTime(clientIP);
+      console.log('🚫 Rate limit exceeded for IP:', clientIP);
       return NextResponse.json({ 
         success: false, 
-        error: 'Email and password are required' 
+        error: 'Too many login attempts. Please try again later.',
+        retryAfter: Math.ceil(remainingTime / 1000)
+      }, { 
+        status: 429,
+        headers: {
+          'Retry-After': Math.ceil(remainingTime / 1000).toString()
+        }
+      });
+    }
+    
+    console.log('🔍 Login data:', { email: body.email });
+    
+    // Validate input using Joi schema
+    const { error, value } = ValidationSchemas.login.validate(body, { abortEarly: false });
+    if (error) {
+      const errors = error.details.map(detail => ({
+        field: detail.path.join('.'),
+        message: detail.message
+      }));
+      
+      console.log('❌ Validation failed:', errors);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Validation failed',
+        details: errors
       }, { status: 400 });
     }
+
+    const { email, password } = value;
 
     // Find user in database
     const user = await prisma.user.findUnique({
@@ -33,8 +67,10 @@ export async function POST(req) {
       }, { status: 401 });
     }
 
-    // Check password
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    // Detect password hashing algorithm and verify
+    const algorithm = PasswordHasher.detectHashAlgorithm(user.password);
+    const isValidPassword = await PasswordHasher.verifyPassword(password, user.password, algorithm);
+    
     if (!isValidPassword) {
       console.log('❌ Invalid password for:', email);
       return NextResponse.json({ 
@@ -43,13 +79,12 @@ export async function POST(req) {
       }, { status: 401 });
     }
 
-    // Generate a simple token
-    const token = Buffer.from(JSON.stringify({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      exp: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
-    })).toString('base64');
+    // Generate proper JWT tokens
+    const tokens = JWTManager.generateTokens(user);
+    console.log('✅ JWT tokens generated');
+
+    // Reset rate limiter on successful login
+    rateLimiter.reset(clientIP);
 
     console.log('✅ Login successful for:', email);
 
@@ -64,7 +99,11 @@ export async function POST(req) {
           name: user.name,
           role: user.role
         },
-        token: token
+        tokens: {
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresIn: tokens.expiresIn
+        }
       }
     }, { status: 200 });
 
