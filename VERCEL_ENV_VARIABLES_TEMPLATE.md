@@ -127,3 +127,4 @@ After adding variables, test them by:
 - **Vercel Docs**: [vercel.com/docs/environment-variables](https://vercel.com/docs/environment-variables)
 - **NextAuth.js Docs**: [next-auth.js.org/configuration/options](https://next-auth.js.org/configuration/options)
 - **Prisma Docs**: [prisma.io/docs/concepts/database-connectors](https://prisma.io/docs/concepts/database-connectors)
+

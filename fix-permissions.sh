@@ -129,3 +129,4 @@ case "$1" in
         echo "  $0 check   # Check current permissions"
         ;;
 esac
+

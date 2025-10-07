@@ -84,3 +84,4 @@ if (missingVars.length === 0) {
 
 console.log('');
 console.log('🔧 Environment variable loading test complete!');
+

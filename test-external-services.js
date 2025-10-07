@@ -331,7 +331,7 @@ function generateReport() {
   
   Object.entries(testResults).forEach(([service, result]) => {
     const icon = result.status === 'success' ? '✅' : 
-                 result.status === 'warning' ? '⚠️' : '❌';
+      result.status === 'warning' ? '⚠️' : '❌';
     const duration = `${result.duration}ms`;
     
     console.log(`${icon} ${service.toUpperCase()}: ${result.status.toUpperCase()} (${duration})`);
@@ -399,3 +399,4 @@ async function runAllTests() {
 
 // Execute tests
 runAllTests().catch(console.error);
+

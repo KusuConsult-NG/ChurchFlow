@@ -67,3 +67,4 @@ jest.setup.js
 # Development scripts
 scripts/
 fix-*.sh
+

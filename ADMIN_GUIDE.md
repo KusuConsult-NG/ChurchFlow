@@ -265,3 +265,4 @@ The admin dashboard provides comprehensive insights into church operations:
 ---
 
 _This admin guide is regularly updated to reflect new features and administrative capabilities. For the latest version, visit the Admin Help Center within ChurchFlow._
+

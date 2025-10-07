@@ -249,3 +249,4 @@ module.exports = {
   checkDatabase,
   checkRedis
 };
+

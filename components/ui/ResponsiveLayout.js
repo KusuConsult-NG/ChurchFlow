@@ -329,3 +329,4 @@ export const ResponsiveTable = ({
     </div>
   );
 };
+

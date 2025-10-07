@@ -108,3 +108,4 @@ export const SkeletonList = ({ items = 3 }) => (
     ))}
   </div>
 );
+

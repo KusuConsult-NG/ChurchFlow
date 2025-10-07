@@ -1,7 +1,8 @@
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { NextResponse } from 'next/server';
 
-// Simple in-memory user storage (in production, use a database)
-const users = new Map();
+const prisma = new PrismaClient();
 
 // Simple signup schema validation
 function validateSignupData(data) {
@@ -46,7 +47,11 @@ export async function POST(req) {
     const { email, password, fullName, role = 'MEMBER' } = body;
 
     // Check if user already exists
-    if (users.has(email)) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (existingUser) {
       console.log('❌ User already exists:', email);
       return NextResponse.json({ 
         success: false, 
@@ -54,21 +59,22 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
-    // Create user
-    const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const user = {
-      id: userId,
-      email: email,
-      name: fullName,
-      role: role,
-      password: password, // In production, hash this password
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+    console.log('✅ Password hashed successfully');
 
-    // Store user in memory
-    users.set(email, user);
-    console.log('✅ User created:', user.id);
+    // Create user in database
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name: fullName,
+        password: hashedPassword,
+        role: role,
+        emailVerified: null
+      }
+    });
+
+    console.log('✅ User created in database:', user.id);
 
     // Generate a simple token
     const token = Buffer.from(JSON.stringify({
@@ -102,5 +108,7 @@ export async function POST(req) {
       error: 'Internal server error',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     }, { status: 500 });
+  } finally {
+    await prisma.$disconnect();
   }
 }

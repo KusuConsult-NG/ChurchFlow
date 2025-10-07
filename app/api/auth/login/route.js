@@ -1,28 +1,8 @@
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { NextResponse } from 'next/server';
 
-// Simple in-memory user storage (in production, use a database)
-const users = new Map();
-
-// Initialize with some test users
-users.set('test@churchflow.com', {
-  id: 'test_user_1',
-  email: 'test@churchflow.com',
-  name: 'Test User',
-  role: 'ADMIN',
-  password: 'password123',
-  createdAt: new Date(),
-  updatedAt: new Date()
-});
-
-users.set('admin@churchflow.com', {
-  id: 'admin_user_1',
-  email: 'admin@churchflow.com',
-  name: 'Admin User',
-  role: 'ADMIN',
-  password: 'admin123',
-  createdAt: new Date(),
-  updatedAt: new Date()
-});
+const prisma = new PrismaClient();
 
 export async function POST(req) {
   try {
@@ -40,8 +20,11 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
-    // Find user
-    const user = users.get(email);
+    // Find user in database
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
     if (!user) {
       console.log('❌ User not found:', email);
       return NextResponse.json({ 
@@ -50,8 +33,9 @@ export async function POST(req) {
       }, { status: 401 });
     }
 
-    // Check password (in production, use proper password hashing)
-    if (user.password !== password) {
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
       console.log('❌ Invalid password for:', email);
       return NextResponse.json({ 
         success: false, 
@@ -91,5 +75,7 @@ export async function POST(req) {
       error: 'Internal server error',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     }, { status: 500 });
+  } finally {
+    await prisma.$disconnect();
   }
 }

@@ -167,3 +167,4 @@ if (totalIssues === 0) {
 }
 
 console.log('🔍 Environment validation complete!');
+

@@ -598,3 +598,4 @@ const AnnouncementView = ({ announcement, onClose }) => {
     </div>
   );
 };
+
