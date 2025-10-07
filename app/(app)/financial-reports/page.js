@@ -21,60 +21,60 @@ export default async function FinancialReports({ searchParams }) {
   try {
     // Generate report data based on type
     switch (reportType) {
-      case 'overview':
-        const [totalIncome, totalExpenses, totalMembers, totalEvents] = await Promise.all([
-          prisma.transaction.aggregate({
-            where: { 
-              type: 'DEPOSIT',
-              createdAt: { gte: new Date(startDate), lte: new Date(endDate) }
-            },
-            _sum: { amount: true }
-          }),
-          prisma.transaction.aggregate({
-            where: { 
-              type: 'WITHDRAWAL',
-              createdAt: { gte: new Date(startDate), lte: new Date(endDate) }
-            },
-            _sum: { amount: true }
-          }),
-          prisma.member.count(),
-          prisma.event.count({
-            where: {
-              date: { gte: new Date(startDate), lte: new Date(endDate) }
-            }
-          })
-        ]);
-        
-        reportData = {
-          totalIncome: totalIncome._sum.amount || 0,
-          totalExpenses: totalExpenses._sum.amount || 0,
-          totalMembers,
-          totalEvents,
-          netIncome: (totalIncome._sum.amount || 0) - (totalExpenses._sum.amount || 0)
-        };
-        break;
-        
-      case 'income':
-        const incomeTransactions = await prisma.transaction.findMany({
+    case 'overview':
+      const [totalIncome, totalExpenses, totalMembers, totalEvents] = await Promise.all([
+        prisma.transaction.aggregate({
           where: { 
             type: 'DEPOSIT',
             createdAt: { gte: new Date(startDate), lte: new Date(endDate) }
           },
-          orderBy: { createdAt: 'desc' },
-          take: 100
-        });
+          _sum: { amount: true }
+        }),
+        prisma.transaction.aggregate({
+          where: { 
+            type: 'WITHDRAWAL',
+            createdAt: { gte: new Date(startDate), lte: new Date(endDate) }
+          },
+          _sum: { amount: true }
+        }),
+        prisma.member.count(),
+        prisma.event.count({
+          where: {
+            date: { gte: new Date(startDate), lte: new Date(endDate) }
+          }
+        })
+      ]);
         
-        reportData = {
-          transactions: incomeTransactions,
-          totalAmount: incomeTransactions.reduce((sum, t) => sum + t.amount, 0)
-        };
-        break;
+      reportData = {
+        totalIncome: totalIncome._sum.amount || 0,
+        totalExpenses: totalExpenses._sum.amount || 0,
+        totalMembers,
+        totalEvents,
+        netIncome: (totalIncome._sum.amount || 0) - (totalExpenses._sum.amount || 0)
+      };
+      break;
         
-      default:
-        reportData = {
-          message: 'Report type not implemented yet',
-          reportType
-        };
+    case 'income':
+      const incomeTransactions = await prisma.transaction.findMany({
+        where: { 
+          type: 'DEPOSIT',
+          createdAt: { gte: new Date(startDate), lte: new Date(endDate) }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100
+      });
+        
+      reportData = {
+        transactions: incomeTransactions,
+        totalAmount: incomeTransactions.reduce((sum, t) => sum + t.amount, 0)
+      };
+      break;
+        
+    default:
+      reportData = {
+        message: 'Report type not implemented yet',
+        reportType
+      };
     }
   } catch (error) {
     console.error('Database connection failed, using default values:', error);
