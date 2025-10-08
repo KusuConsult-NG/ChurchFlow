@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+
 import { getUserByEmail } from '../../../../lib/user-storage';
 
 export async function POST(req) {
