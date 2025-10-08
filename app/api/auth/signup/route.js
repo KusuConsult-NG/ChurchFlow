@@ -1,129 +1,99 @@
 import { NextResponse } from 'next/server';
 
-import AuthenticationService from '../../../../lib/auth-service';
-import { 
-  ValidationSchemas, 
-  PasswordStrengthChecker,
-  RateLimiter 
-} from '../../../../lib/security';
+// Simple in-memory user storage for testing
+const users = new Map();
 
-const rateLimiter = new RateLimiter();
+// Add some test users
+users.set('test@churchflow.com', {
+  id: '1',
+  email: 'test@churchflow.com',
+  name: 'Test User',
+  role: 'ADMIN',
+  password: 'TestPassword123!'
+});
+
+users.set('admin@churchflow.com', {
+  id: '2',
+  email: 'admin@churchflow.com',
+  name: 'Admin User',
+  role: 'ADMIN',
+  password: 'AdminPassword123!'
+});
+
+users.set('member@churchflow.com', {
+  id: '3',
+  email: 'member@churchflow.com',
+  name: 'Member User',
+  role: 'MEMBER',
+  password: 'MemberPassword123!'
+});
 
 export async function POST(req) {
   try {
     console.log('🔍 Signup request received');
     
     const body = await req.json();
-    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
-    
-    // Rate limiting check
-    if (rateLimiter.isRateLimited(clientIP)) {
-      const remainingTime = rateLimiter.getRemainingTime(clientIP);
-      console.log('🚫 Rate limit exceeded for IP:', clientIP);
+    const { email, password, fullName, role } = body;
+
+    console.log('🔍 Signup data:', { email, fullName, role });
+
+    // Basic validation
+    if (!email || !password || !fullName) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Too many signup attempts. Please try again later.',
-        retryAfter: Math.ceil(remainingTime / 1000)
-      }, { 
-        status: 429,
-        headers: {
-          'Retry-After': Math.ceil(remainingTime / 1000).toString()
-        }
-      });
-    }
-    
-    console.log('🔍 Signup data:', { email: body.email, fullName: body.fullName, role: body.role });
-    
-    // Validate input using Joi schema
-    const { error, value } = ValidationSchemas.signup.validate(body, { abortEarly: false });
-    if (error) {
-      const errors = error.details.map(detail => ({
-        field: detail.path.join('.'),
-        message: detail.message
-      }));
-      
-      console.log('❌ Validation failed:', errors);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Validation failed',
-        details: errors
+        error: 'Email, password, and full name are required' 
       }, { status: 400 });
     }
 
-    const { email, password, fullName, role } = value;
-
-    // Check password strength
-    const passwordCheck = PasswordStrengthChecker.checkStrength(password);
-    if (!passwordCheck.isValid) {
-      console.log('❌ Weak password detected');
+    if (password.length < 6) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Password does not meet security requirements',
-        details: {
-          strength: passwordCheck.strength,
-          score: passwordCheck.score,
-          checks: passwordCheck.checks
-        }
+        error: 'Password must be at least 6 characters' 
       }, { status: 400 });
     }
 
-    // Check if user already exists (database + fallback)
-    const userExists = await AuthenticationService.checkUserExists(email);
-    if (userExists.exists) {
-      console.log('❌ User already exists:', email, 'in', userExists.source);
+    // Check if user already exists
+    if (users.has(email)) {
       return NextResponse.json({ 
         success: false, 
         error: 'User with this email already exists' 
       }, { status: 400 });
     }
 
-    // Create user (database + fallback)
-    const { user, source } = await AuthenticationService.createUser({
+    // Create new user
+    const newUser = {
+      id: Date.now().toString(),
       email,
-      password,
-      fullName,
-      role
-    });
+      name: fullName,
+      role: role || 'MEMBER',
+      password // In production, hash this password
+    };
 
-    console.log('✅ User created in', source, ':', user.id);
+    users.set(email, newUser);
+    console.log('✅ User created:', newUser.id);
 
-    // Generate JWT tokens
-    const tokens = AuthenticationService.generateTokens(user);
-    console.log('✅ JWT tokens generated');
-
-    // Reset rate limiter on successful signup
-    rateLimiter.reset(clientIP);
+    // Generate simple token (in production, use proper JWT)
+    const token = Buffer.from(JSON.stringify({ userId: newUser.id, email: newUser.email })).toString('base64');
 
     console.log('✅ Signup successful for:', email);
 
-    // Return success response
     return NextResponse.json({
       success: true,
-      message: source === 'fallback' ? 'User created successfully (using fallback storage)' : 'User created successfully',
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role
-        },
-        tokens: {
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          expiresIn: tokens.expiresIn
-        }
+      message: 'User created successfully',
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role
       },
-      warning: source === 'fallback' ? 'Database unavailable - using fallback storage' : undefined
+      token
     }, { status: 201 });
 
   } catch (error) {
     console.error('❌ Signup error:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: 'Internal server error' 
     }, { status: 500 });
-  } finally {
-    await AuthenticationService.disconnect();
   }
 }

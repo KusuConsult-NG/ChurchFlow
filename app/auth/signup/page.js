@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+
+import { useAuth } from '../../../context/AuthContext';
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -14,9 +15,7 @@ export default function SignupPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const router = useRouter();
+  const { signup } = useAuth();
 
   const handleChange = (e) => {
     setFormData({
@@ -37,65 +36,22 @@ export default function SignupPage() {
       return;
     }
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters');
-      setIsLoading(false);
-      return;
-    }
-
-    // Enhanced password validation
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
-    if (!passwordRegex.test(formData.password)) {
-      setError('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character');
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
       setIsLoading(false);
       return;
     }
 
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          fullName: formData.fullName,
-          role: formData.role
-        })
+      const result = await signup({
+        email: formData.email,
+        password: formData.password,
+        fullName: formData.fullName,
+        role: formData.role
       });
 
-      const data = await response.json();
-      console.log('🔍 Signup API Response:', data);
-
-      if (data.success) {
-        // Store user data and tokens
-        console.log('🔍 Storing tokens:', {
-          accessToken: data.data.tokens.accessToken,
-          refreshToken: data.data.tokens.refreshToken,
-          user: data.data.user
-        });
-        
-        localStorage.setItem('accessToken', data.data.tokens.accessToken);
-        localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
-        localStorage.setItem('user', JSON.stringify(data.data.user));
-        
-        console.log('✅ Tokens stored successfully');
-        console.log('🔍 Stored accessToken:', localStorage.getItem('accessToken')?.substring(0, 20) + '...');
-        console.log('🔍 Stored refreshToken:', localStorage.getItem('refreshToken')?.substring(0, 20) + '...');
-        console.log('🔍 Stored user:', localStorage.getItem('user'));
-        
-        // Redirect to dashboard
-        console.log('🔄 Redirecting to dashboard...');
-        router.push('/dashboard');
-      } else {
-        // Handle validation errors
-        if (data.details && Array.isArray(data.details)) {
-          const errorMessages = data.details.map(detail => detail.message).join(', ');
-          setError(errorMessages);
-        } else {
-          setError(data.error || 'Signup failed. Please try again.');
-        }
+      if (!result.success) {
+        setError(result.error || 'Signup failed. Please try again.');
       }
     } catch (err) {
       console.error('Signup error:', err);
@@ -183,62 +139,32 @@ export default function SignupPage() {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
-              <div className="mt-1 relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter your password"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {showPassword ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    )}
-                  </svg>
-                </button>
-              </div>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                value={formData.password}
+                onChange={handleChange}
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Enter your password"
+              />
             </div>
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
                 Confirm Password
               </label>
-              <div className="mt-1 relative">
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  required
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Confirm your password"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                >
-                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {showConfirmPassword ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    )}
-                  </svg>
-                </button>
-              </div>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                required
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Confirm your password"
+              />
             </div>
           </div>
 

@@ -1,117 +1,91 @@
 import { NextResponse } from 'next/server';
 
-import AuthenticationService from '../../../../lib/auth-service';
-import { 
-  ValidationSchemas,
-  RateLimiter 
-} from '../../../../lib/security';
+// Simple in-memory user storage for testing
+const users = new Map();
 
-const rateLimiter = new RateLimiter();
+// Add some test users
+users.set('test@churchflow.com', {
+  id: '1',
+  email: 'test@churchflow.com',
+  name: 'Test User',
+  role: 'ADMIN',
+  password: 'TestPassword123!'
+});
+
+users.set('admin@churchflow.com', {
+  id: '2',
+  email: 'admin@churchflow.com',
+  name: 'Admin User',
+  role: 'ADMIN',
+  password: 'AdminPassword123!'
+});
+
+users.set('member@churchflow.com', {
+  id: '3',
+  email: 'member@churchflow.com',
+  name: 'Member User',
+  role: 'MEMBER',
+  password: 'MemberPassword123!'
+});
 
 export async function POST(req) {
   try {
     console.log('🔍 Login request received');
     
     const body = await req.json();
-    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
-    
-    // Rate limiting check
-    if (rateLimiter.isRateLimited(clientIP)) {
-      const remainingTime = rateLimiter.getRemainingTime(clientIP);
-      console.log('🚫 Rate limit exceeded for IP:', clientIP);
+    const { email, password } = body;
+
+    console.log('🔍 Login data:', { email });
+
+    // Basic validation
+    if (!email || !password) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Too many login attempts. Please try again later.',
-        retryAfter: Math.ceil(remainingTime / 1000)
-      }, { 
-        status: 429,
-        headers: {
-          'Retry-After': Math.ceil(remainingTime / 1000).toString()
-        }
-      });
-    }
-    
-    console.log('🔍 Login data:', { email: body.email });
-    
-    // Validate input using Joi schema
-    const { error, value } = ValidationSchemas.login.validate(body, { abortEarly: false });
-    if (error) {
-      const errors = error.details.map(detail => ({
-        field: detail.path.join('.'),
-        message: detail.message
-      }));
-      
-      console.log('❌ Validation failed:', errors);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Validation failed',
-        details: errors
+        error: 'Email and password are required' 
       }, { status: 400 });
     }
 
-    const { email, password } = value;
-
-    // Find user (database + fallback)
-    const { user, source } = await AuthenticationService.findUserByEmail(email);
-    
+    // Find user
+    const user = users.get(email);
     if (!user) {
-      console.log('❌ User not found:', email);
       return NextResponse.json({ 
         success: false, 
         error: 'Invalid email or password' 
       }, { status: 401 });
     }
 
-    // Verify password
-    const isValidPassword = await AuthenticationService.verifyPassword(user, password, source);
-    
-    if (!isValidPassword) {
-      console.log('❌ Invalid password for:', email);
+    // Check password
+    if (user.password !== password) {
       return NextResponse.json({ 
         success: false, 
         error: 'Invalid email or password' 
       }, { status: 401 });
     }
 
-    console.log('✅ User authenticated successfully from', source);
+    console.log('✅ User authenticated:', user.email);
 
-    // Generate JWT tokens
-    const tokens = AuthenticationService.generateTokens(user);
-    console.log('✅ JWT tokens generated');
-
-    // Reset rate limiter on successful login
-    rateLimiter.reset(clientIP);
+    // Generate simple token (in production, use proper JWT)
+    const token = Buffer.from(JSON.stringify({ userId: user.id, email: user.email })).toString('base64');
 
     console.log('✅ Login successful for:', email);
 
-    // Return success response
     return NextResponse.json({
       success: true,
-      message: source === 'fallback' ? 'Login successful (using fallback storage)' : 'Login successful',
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role
-        },
-        tokens: {
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          expiresIn: tokens.expiresIn
-        }
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
       },
-      warning: source === 'fallback' ? 'Database unavailable - using fallback storage' : undefined
+      token
     }, { status: 200 });
 
   } catch (error) {
     console.error('❌ Login error:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: 'Internal server error' 
     }, { status: 500 });
-  } finally {
-    await AuthenticationService.disconnect();
   }
 }

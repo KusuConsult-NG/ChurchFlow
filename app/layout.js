@@ -1,25 +1,22 @@
 import './globals.css';
-import AuthWrapper from '../components/AuthWrapper';
 
-import Providers from './providers';
+import AuthGuard from '../components/AuthGuard';
+import { AuthProvider } from '../context/AuthContext';
 
 export const metadata = {
   title: 'ChurchFlow',
-  description: 'Server-first Next.js'
+  description: 'Church Management System'
 };
-
-// Force dynamic rendering for all pages
-export const dynamic = 'force-dynamic';
 
 export default function RootLayout({ children }) {
   return (
-    <html lang='en' suppressHydrationWarning>
-      <body className='min-h-screen bg-gray-50'>
-        <Providers>
-          <AuthWrapper>
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen bg-gray-50">
+        <AuthProvider>
+          <AuthGuard>
             {children}
-          </AuthWrapper>
-        </Providers>
+          </AuthGuard>
+        </AuthProvider>
       </body>
     </html>
   );
