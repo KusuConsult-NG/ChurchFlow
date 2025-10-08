@@ -193,6 +193,22 @@ export default function SignupPage() {
               </Link>
             </p>
           </div>
+
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-gray-50 text-gray-500">Or use test accounts</span>
+              </div>
+            </div>
+            <div className="mt-4 text-sm text-gray-600 space-y-1">
+              <p><strong>Admin:</strong> admin@churchflow.com / AdminPassword123!</p>
+              <p><strong>Test:</strong> test@churchflow.com / TestPassword123!</p>
+              <p><strong>Member:</strong> member@churchflow.com / MemberPassword123!</p>
+            </div>
+          </div>
         </form>
       </div>
     </div>
