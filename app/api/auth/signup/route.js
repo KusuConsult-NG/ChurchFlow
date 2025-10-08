@@ -1,15 +1,12 @@
-import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 
+import AuthenticationService from '../../../../lib/auth-service';
 import { 
-  PasswordHasher, 
-  JWTManager, 
   ValidationSchemas, 
   PasswordStrengthChecker,
   RateLimiter 
 } from '../../../../lib/security';
 
-const prisma = new PrismaClient();
 const rateLimiter = new RateLimiter();
 
 export async function POST(req) {
@@ -70,60 +67,28 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
-    // Try database operations with fallback
-    let user = null;
-    let databaseError = null;
-
-    try {
-      // Check if user already exists
-      const existingUser = await prisma.user.findUnique({
-        where: { email }
-      });
-
-      if (existingUser) {
-        console.log('❌ User already exists:', email);
-        return NextResponse.json({ 
-          success: false, 
-          error: 'User with this email already exists' 
-        }, { status: 400 });
-      }
-
-      // Hash password with argon2 (more secure than bcrypt)
-      const hashedPassword = await PasswordHasher.hashPassword(password, 'argon2');
-      console.log('✅ Password hashed with argon2');
-
-      // Create user in database
-      user = await prisma.user.create({
-        data: {
-          email,
-          name: fullName,
-          password: hashedPassword,
-          role: role,
-          emailVerified: null
-        }
-      });
-
-      console.log('✅ User created in database:', user.id);
-
-    } catch (dbError) {
-      console.error('❌ Database error:', dbError.message);
-      databaseError = dbError.message;
-      
-      // For now, create a temporary user object for fallback
-      user = {
-        id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        email,
-        name: fullName,
-        role: role,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      console.log('⚠️ Using fallback user creation:', user.id);
+    // Check if user already exists (database + fallback)
+    const userExists = await AuthenticationService.checkUserExists(email);
+    if (userExists.exists) {
+      console.log('❌ User already exists:', email, 'in', userExists.source);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'User with this email already exists' 
+      }, { status: 400 });
     }
 
-    // Generate proper JWT tokens
-    const tokens = JWTManager.generateTokens(user);
+    // Create user (database + fallback)
+    const { user, source } = await AuthenticationService.createUser({
+      email,
+      password,
+      fullName,
+      role
+    });
+
+    console.log('✅ User created in', source, ':', user.id);
+
+    // Generate JWT tokens
+    const tokens = AuthenticationService.generateTokens(user);
     console.log('✅ JWT tokens generated');
 
     // Reset rate limiter on successful signup
@@ -134,7 +99,7 @@ export async function POST(req) {
     // Return success response
     return NextResponse.json({
       success: true,
-      message: databaseError ? 'User created successfully (database connection issue - using fallback)' : 'User created successfully',
+      message: source === 'fallback' ? 'User created successfully (using fallback storage)' : 'User created successfully',
       data: {
         user: {
           id: user.id,
@@ -148,7 +113,7 @@ export async function POST(req) {
           expiresIn: tokens.expiresIn
         }
       },
-      warning: databaseError ? 'Database connection failed - user created temporarily' : undefined
+      warning: source === 'fallback' ? 'Database unavailable - using fallback storage' : undefined
     }, { status: 201 });
 
   } catch (error) {
@@ -159,10 +124,6 @@ export async function POST(req) {
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     }, { status: 500 });
   } finally {
-    try {
-      await prisma.$disconnect();
-    } catch (disconnectError) {
-      console.log('⚠️ Database disconnect error (ignored):', disconnectError.message);
-    }
+    await AuthenticationService.disconnect();
   }
 }

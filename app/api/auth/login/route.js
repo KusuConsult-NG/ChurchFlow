@@ -1,14 +1,11 @@
-import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 
+import AuthenticationService from '../../../../lib/auth-service';
 import { 
-  PasswordHasher, 
-  JWTManager, 
   ValidationSchemas,
   RateLimiter 
 } from '../../../../lib/security';
 
-const prisma = new PrismaClient();
 const rateLimiter = new RateLimiter();
 
 export async function POST(req) {
@@ -54,57 +51,32 @@ export async function POST(req) {
 
     const { email, password } = value;
 
-    // Try database operations with fallback
-    let user = null;
-    let databaseError = null;
-
-    try {
-      // Find user in database
-      user = await prisma.user.findUnique({
-        where: { email }
-      });
-
-      if (!user) {
-        console.log('❌ User not found:', email);
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Invalid email or password' 
-        }, { status: 401 });
-      }
-
-      // Detect password hashing algorithm and verify
-      const algorithm = PasswordHasher.detectHashAlgorithm(user.password);
-      const isValidPassword = await PasswordHasher.verifyPassword(password, user.password, algorithm);
-      
-      if (!isValidPassword) {
-        console.log('❌ Invalid password for:', email);
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Invalid email or password' 
-        }, { status: 401 });
-      }
-
-      console.log('✅ User authenticated successfully');
-
-    } catch (dbError) {
-      console.error('❌ Database error:', dbError.message);
-      databaseError = dbError.message;
-      
-      // For fallback, create a temporary user (this is not secure for production)
-      user = {
-        id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        email,
-        name: 'Database User',
-        role: 'MEMBER',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      console.log('⚠️ Using fallback authentication:', user.id);
+    // Find user (database + fallback)
+    const { user, source } = await AuthenticationService.findUserByEmail(email);
+    
+    if (!user) {
+      console.log('❌ User not found:', email);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid email or password' 
+      }, { status: 401 });
     }
 
-    // Generate proper JWT tokens
-    const tokens = JWTManager.generateTokens(user);
+    // Verify password
+    const isValidPassword = await AuthenticationService.verifyPassword(user, password, source);
+    
+    if (!isValidPassword) {
+      console.log('❌ Invalid password for:', email);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid email or password' 
+      }, { status: 401 });
+    }
+
+    console.log('✅ User authenticated successfully from', source);
+
+    // Generate JWT tokens
+    const tokens = AuthenticationService.generateTokens(user);
     console.log('✅ JWT tokens generated');
 
     // Reset rate limiter on successful login
@@ -115,7 +87,7 @@ export async function POST(req) {
     // Return success response
     return NextResponse.json({
       success: true,
-      message: databaseError ? 'Login successful (database connection issue - using fallback)' : 'Login successful',
+      message: source === 'fallback' ? 'Login successful (using fallback storage)' : 'Login successful',
       data: {
         user: {
           id: user.id,
@@ -129,7 +101,7 @@ export async function POST(req) {
           expiresIn: tokens.expiresIn
         }
       },
-      warning: databaseError ? 'Database connection failed - using temporary authentication' : undefined
+      warning: source === 'fallback' ? 'Database unavailable - using fallback storage' : undefined
     }, { status: 200 });
 
   } catch (error) {
@@ -140,10 +112,6 @@ export async function POST(req) {
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     }, { status: 500 });
   } finally {
-    try {
-      await prisma.$disconnect();
-    } catch (disconnectError) {
-      console.log('⚠️ Database disconnect error (ignored):', disconnectError.message);
-    }
+    await AuthenticationService.disconnect();
   }
 }
