@@ -37,8 +37,16 @@ export default function SignupPage() {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters');
+      setIsLoading(false);
+      return;
+    }
+
+    // Enhanced password validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+    if (!passwordRegex.test(formData.password)) {
+      setError('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character');
       setIsLoading(false);
       return;
     }
@@ -60,14 +68,21 @@ export default function SignupPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Store user data and token
-        localStorage.setItem('token', data.data.token);
+        // Store user data and tokens
+        localStorage.setItem('accessToken', data.data.tokens.accessToken);
+        localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
         localStorage.setItem('user', JSON.stringify(data.data.user));
         
         // Redirect to dashboard
         router.push('/dashboard');
       } else {
-        setError(data.error || 'Signup failed. Please try again.');
+        // Handle validation errors
+        if (data.details && Array.isArray(data.details)) {
+          const errorMessages = data.details.map(detail => detail.message).join(', ');
+          setError(errorMessages);
+        } else {
+          setError(data.error || 'Signup failed. Please try again.');
+        }
       }
     } catch (err) {
       console.error('Signup error:', err);
