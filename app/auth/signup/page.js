@@ -66,14 +66,27 @@ export default function SignupPage() {
       });
 
       const data = await response.json();
+      console.log('🔍 Signup API Response:', data);
 
       if (data.success) {
         // Store user data and tokens
+        console.log('🔍 Storing tokens:', {
+          accessToken: data.data.tokens.accessToken,
+          refreshToken: data.data.tokens.refreshToken,
+          user: data.data.user
+        });
+        
         localStorage.setItem('accessToken', data.data.tokens.accessToken);
         localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
         localStorage.setItem('user', JSON.stringify(data.data.user));
         
+        console.log('✅ Tokens stored successfully');
+        console.log('🔍 Stored accessToken:', localStorage.getItem('accessToken')?.substring(0, 20) + '...');
+        console.log('🔍 Stored refreshToken:', localStorage.getItem('refreshToken')?.substring(0, 20) + '...');
+        console.log('🔍 Stored user:', localStorage.getItem('user'));
+        
         // Redirect to dashboard
+        console.log('🔄 Redirecting to dashboard...');
         router.push('/dashboard');
       } else {
         // Handle validation errors
