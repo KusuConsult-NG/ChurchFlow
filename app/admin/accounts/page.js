@@ -1,9 +1,11 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import { safeFindMany } from '../../../lib/database-safe';
+
 export default async function Page() {
-  const items = await prisma.accountBook.findMany({
+  // Use safe database operation that won't fail during build
+  const items = await safeFindMany('accountBook', {
     orderBy: { createdAt: 'desc' }
   });
+
   return (
     <main>
       <h2 className='text-2xl font-bold'>Accounts</h2>
