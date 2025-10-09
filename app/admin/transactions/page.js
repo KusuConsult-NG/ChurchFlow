@@ -1,10 +1,32 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-export default async function Page() {
-  const items = await prisma.transaction.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: { book: true }
-  });
+'use client';
+
+import { useState, useEffect } from 'react';
+
+export default function Page() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/transaction')
+      .then(res => res.json())
+      .then(data => {
+        setItems(data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching transactions:', err);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <main>
+        <h2 className='text-2xl font-bold'>Transactions</h2>
+        <p>Loading transactions...</p>
+      </main>
+    );
+  }
   return (
     <main>
       <h2 className='text-2xl font-bold'>Transactions</h2>
