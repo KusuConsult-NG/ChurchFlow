@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-
-import { getUserByEmail } from '../../../../lib/user-storage';
+import { getPrismaClient } from '../../../../lib/database-config';
 
 export async function POST(req) {
   try {
@@ -19,8 +18,12 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
-    // Find user
-    const user = getUserByEmail(email);
+    // Find user in database
+    const prisma = await getPrismaClient();
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+    
     if (!user) {
       console.log('❌ User not found:', email);
       return NextResponse.json({ 

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { createSuccessResponse, createErrorResponse, generateToken } from '../../../../lib/auth';
 import { GOOGLE_CONFIG } from '../../../../lib/google-config';
-import { getUserByEmail, createUser } from '../../../../lib/user-storage';
+import { getPrismaClient } from '../../../../lib/database-config';
 
 const client = new OAuth2Client(GOOGLE_CONFIG.CLIENT_ID);
 
@@ -120,20 +120,24 @@ export async function POST(req) {
 
     console.log('✅ Google token verified for email:', email);
 
-    // Check if user already exists
-    let user = getUserByEmail(email);
+    // Check if user already exists in database
+    const prisma = await getPrismaClient();
+    let user = await prisma.user.findUnique({
+      where: { email }
+    });
     
     if (!user) {
       console.log('📝 Creating new user for:', email);
-      // Create new user
-      user = createUser({
-        email,
-        fullName: name || 'Google User',
-        phone: '', // Google doesn't provide phone
-        role: role,
-        password: '', // No password for Google users
-        googleId: payload.sub,
-        profilePicture: picture
+      // Create new user in database
+      user = await prisma.user.create({
+        data: {
+          email,
+          name: name || 'Google User',
+          role: role || 'MEMBER',
+          password: '', // No password for Google users
+          googleId: payload.sub,
+          profilePicture: picture
+        }
       });
     } else {
       console.log('✅ Existing user found:', email);

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-
-import { createUser, userExists } from '../../../../lib/user-storage';
+import { getPrismaClient } from '../../../../lib/database-config';
 
 export async function POST(req) {
   try {
@@ -26,8 +25,13 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
-    // Check if user already exists
-    if (userExists(email)) {
+    // Check if user already exists in database
+    const prisma = await getPrismaClient();
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
+    
+    if (existingUser) {
       console.log('❌ User already exists:', email);
       return NextResponse.json({ 
         success: false, 
@@ -35,8 +39,15 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
-    // Create new user
-    const newUser = createUser({ email, password, fullName, role });
+    // Create new user in database
+    const newUser = await prisma.user.create({
+      data: {
+        email,
+        password,
+        name: fullName,
+        role: role || 'MEMBER'
+      }
+    });
     console.log('✅ User created:', newUser.id);
 
     // Generate simple token (in production, use proper JWT)
