@@ -59,3 +59,4 @@ async function testLocalDatabase() {
 // Run the test
 testLocalDatabase();
 
+

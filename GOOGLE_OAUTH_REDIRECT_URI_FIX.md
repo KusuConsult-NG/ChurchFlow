@@ -102,3 +102,4 @@ http://localhost:3000/api/auth/[...nextauth]
 5. **Test Google sign-in**
 
 This should resolve the `redirect_uri_mismatch` error immediately!
+

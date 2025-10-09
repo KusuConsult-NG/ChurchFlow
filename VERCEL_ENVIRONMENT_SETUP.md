@@ -149,3 +149,4 @@ After adding variables and redeploying:
 3. Check if pages load without errors
 
 **Expected Result**: App loads successfully with login functionality working.
+

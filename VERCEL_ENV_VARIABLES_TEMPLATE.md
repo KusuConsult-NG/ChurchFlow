@@ -128,3 +128,4 @@ After adding variables, test them by:
 - **NextAuth.js Docs**: [next-auth.js.org/configuration/options](https://next-auth.js.org/configuration/options)
 - **Prisma Docs**: [prisma.io/docs/concepts/database-connectors](https://prisma.io/docs/concepts/database-connectors)
 
+

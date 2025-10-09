@@ -110,3 +110,4 @@ function getRecommendations(envCheck, dbStatus, nextAuthStatus) {
 
   return recommendations;
 }
+
