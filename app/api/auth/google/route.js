@@ -1,4 +1,10 @@
 import { NextResponse } from 'next/server';
+import { OAuth2Client } from 'google-auth-library';
+import { createSuccessResponse, createErrorResponse, generateToken } from '../../../../lib/auth';
+import { postgresDb as db } from '../../../../lib/postgres-database';
+import { GOOGLE_CONFIG } from '../../../../lib/google-config';
+
+const client = new OAuth2Client(GOOGLE_CONFIG.CLIENT_ID);
 
 // Simple rate limiting storage (in production, use Redis or database)
 const rateLimitStore = new Map();
@@ -72,68 +78,80 @@ export async function POST(req) {
   try {
     console.log('🔍 Google OAuth request received');
     
-    // Check rate limiting
-    const clientId = getClientIdentifier(req);
-    console.log('🔍 Client ID:', clientId);
-    
-    const rateLimitCheck = checkRateLimit(clientId);
-    console.log('🔍 Rate limit check:', rateLimitCheck);
-    
-    if (!rateLimitCheck.allowed) {
-      console.log('🚫 Rate limit exceeded for client:', clientId);
-      return NextResponse.json({
-        error: rateLimitCheck.message,
-        retryAfter: rateLimitCheck.retryAfter
-      }, { 
-        status: 429,
-        headers: {
-          'Retry-After': rateLimitCheck.retryAfter.toString(),
-          'X-RateLimit-Limit': RATE_LIMIT_CONFIG.maxAttempts.toString(),
-          'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset': new Date(Date.now() + rateLimitCheck.retryAfter * 1000).toISOString()
-        }
-      });
+    // Check if Google OAuth is properly configured
+    if (!GOOGLE_CONFIG.isConfigured()) {
+      console.log('❌ Google OAuth not configured');
+      return NextResponse.json(createErrorResponse(
+        'Google OAuth is not configured. Please set up Google OAuth credentials in your .env.local file.'
+      ), { status: 400 });
     }
 
     const body = await req.json();
     console.log('🔍 Request body received:', { token: body.token ? 'present' : 'missing', role: body.role });
     
-    const { token, role = 'MEMBER' } = body;
+    const { token, role = 'rider' } = body;
 
     if (!token) {
       console.log('❌ No Google token provided');
-      return NextResponse.json({ error: 'Google token is required' }, { status: 400 });
+      return NextResponse.json(createErrorResponse('Google token is required'), { status: 400 });
     }
 
-    console.log('✅ Google token received, processing...');
+    console.log('✅ Google token received, verifying...');
     
-    // For now, return a success response to test the flow
-    // In a real implementation, you would verify the Google token here
-    return NextResponse.json({
-      success: true,
-      message: 'Google authentication successful',
-      data: {
-        user: {
-          id: 'temp-user-id',
-          email: 'user@example.com',
-          name: 'Google User',
-          role: role
-        },
-        token: 'temp-jwt-token'
-      }
-    }, { 
-      status: 200,
-      headers: {
-        'X-RateLimit-Limit': RATE_LIMIT_CONFIG.maxAttempts.toString(),
-        'X-RateLimit-Remaining': rateLimitCheck.attemptsRemaining?.toString() || '0'
-      }
+    // Verify the Google token
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: GOOGLE_CONFIG.CLIENT_ID,
     });
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      console.log('❌ Invalid Google token');
+      return NextResponse.json(createErrorResponse('Invalid Google token'), { status: 400 });
+    }
+
+    const { email, name, picture } = payload;
+
+    if (!email) {
+      console.log('❌ Email not provided by Google');
+      return NextResponse.json(createErrorResponse('Email not provided by Google'), { status: 400 });
+    }
+
+    console.log('✅ Google token verified for email:', email);
+
+    // Check if user already exists
+    let user = await db.getUserByEmail(email);
+    
+    if (!user) {
+      console.log('📝 Creating new user for:', email);
+      // Create new user
+      user = await db.createUser({
+        email,
+        fullName: name || 'Google User',
+        phone: '', // Google doesn't provide phone
+        role: role,
+        password: '', // No password for Google users
+        googleId: payload.sub,
+        profilePicture: picture
+      });
+    } else {
+      console.log('✅ Existing user found:', email);
+    }
+
+    // Generate our own JWT token using the same function as other auth routes
+    const ourToken = generateToken(user.id, user.role);
+
+    // Return success response (don't include password)
+    const { password: _, ...userWithoutPassword } = user;
+    
+    console.log('✅ Google authentication successful for:', email);
+    return NextResponse.json(createSuccessResponse({
+      user: userWithoutPassword,
+      token: ourToken
+    }, 'Google authentication successful'));
 
   } catch (error) {
     console.error('❌ Google auth error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    }, { status: 500 });
+    return NextResponse.json(createErrorResponse('Google authentication failed', 500), { status: 500 });
   }
 }
