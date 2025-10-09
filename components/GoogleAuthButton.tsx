@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+
 import { useAuth } from '../context/AuthContext';
 
 // Load Google API script
 const loadGoogleScript = () => {
-  return new Promise((resolve, reject) => {
-    if (window.google) {
+  return new Promise<void>((resolve, reject) => {
+    if ((window as any).google) {
       resolve();
       return;
     }
@@ -15,8 +16,8 @@ const loadGoogleScript = () => {
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.defer = true;
-    script.onload = resolve;
-    script.onerror = reject;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google script'));
     document.head.appendChild(script);
   });
 };
@@ -48,12 +49,12 @@ export default function GoogleAuthButton({
       }
 
       // Load Google API script if not already loaded
-      if (!window.google) {
+      if (!(window as any).google) {
         await loadGoogleScript();
       }
 
       // Initialize Google Auth
-      const authInstance = window.google.accounts.id.initialize({
+      const authInstance = (window as any).google.accounts.id.initialize({
         client_id: clientId,
         callback: async (response: any) => {
           try {

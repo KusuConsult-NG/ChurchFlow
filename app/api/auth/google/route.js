@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
 import { OAuth2Client } from 'google-auth-library';
+import { NextResponse } from 'next/server';
+
 import { createSuccessResponse, createErrorResponse, generateToken } from '../../../../lib/auth';
-import { postgresDb as db } from '../../../../lib/postgres-database';
 import { GOOGLE_CONFIG } from '../../../../lib/google-config';
+import { getUserByEmail, createUser } from '../../../../lib/user-storage';
 
 const client = new OAuth2Client(GOOGLE_CONFIG.CLIENT_ID);
 
@@ -101,7 +102,7 @@ export async function POST(req) {
     // Verify the Google token
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: GOOGLE_CONFIG.CLIENT_ID,
+      audience: GOOGLE_CONFIG.CLIENT_ID
     });
 
     const payload = ticket.getPayload();
@@ -120,12 +121,12 @@ export async function POST(req) {
     console.log('✅ Google token verified for email:', email);
 
     // Check if user already exists
-    let user = await db.getUserByEmail(email);
+    let user = getUserByEmail(email);
     
     if (!user) {
       console.log('📝 Creating new user for:', email);
       // Create new user
-      user = await db.createUser({
+      user = createUser({
         email,
         fullName: name || 'Google User',
         phone: '', // Google doesn't provide phone

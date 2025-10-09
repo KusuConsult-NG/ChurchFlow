@@ -1,9 +1,32 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-export default async function Page() {
-  const items = await prisma.project.findMany({
-    orderBy: { createdAt: 'desc' }
-  });
+'use client';
+
+import { useState, useEffect } from 'react';
+
+export default function Page() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(data => {
+        setItems(data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching projects:', err);
+        setLoading(false);
+      });
+  }, []);
+  if (loading) {
+    return (
+      <main>
+        <h2 className='text-2xl font-bold'>Projects</h2>
+        <p>Loading projects...</p>
+      </main>
+    );
+  }
+
   return (
     <main>
       <h2 className='text-2xl font-bold'>Projects</h2>
