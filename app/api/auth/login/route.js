@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getPrismaClient } from '../../../../lib/database-config';
+import { users, generateToken } from '../../../../lib/shared-auth';
 
 export async function POST(req) {
   try {
@@ -19,11 +19,8 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
-    // Find user in database
-    const prisma = await getPrismaClient();
-    const user = await prisma.user.findUnique({
-      where: { email }
-    });
+    // Find user
+    const user = users.get(email);
     
     if (!user) {
       console.log('❌ User not found:', email);
@@ -44,8 +41,8 @@ export async function POST(req) {
 
     console.log('✅ User authenticated:', user.email);
 
-    // Generate simple token (in production, use proper JWT)
-    const token = Buffer.from(JSON.stringify({ userId: user.id, email: user.email })).toString('base64');
+    // Generate token
+    const token = generateToken(user.id);
 
     console.log('✅ Login successful for:', email);
 

@@ -1,38 +1,27 @@
 import { NextResponse } from 'next/server';
 
-import { getPrismaClient } from '../../../../lib/database-config';
+import { users, generateToken, validateUser } from '../../../../lib/shared-auth';
 
 export async function POST(req) {
   try {
     console.log('🔍 Signup request received');
     
     const body = await req.json();
-    const { email, password, fullName, role } = body;
+    const { email, password, fullName, role = 'MEMBER' } = body;
 
     console.log('🔍 Signup data:', { email, fullName, role });
 
-    // Basic validation
-    if (!email || !password || !fullName) {
+    // Validate input
+    const validation = validateUser(email, password, fullName);
+    if (!validation.valid) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Email, password, and full name are required' 
+        error: validation.error 
       }, { status: 400 });
     }
 
-    if (password.length < 6) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Password must be at least 6 characters' 
-      }, { status: 400 });
-    }
-
-    // Check if user already exists in database
-    const prisma = await getPrismaClient();
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    });
-    
-    if (existingUser) {
+    // Check if user already exists
+    if (users.has(email)) {
       console.log('❌ User already exists:', email);
       return NextResponse.json({ 
         success: false, 
@@ -40,19 +29,22 @@ export async function POST(req) {
       }, { status: 400 });
     }
 
-    // Create new user in database
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        password,
-        name: fullName,
-        role: role || 'MEMBER'
-      }
-    });
-    console.log('✅ User created:', newUser.id);
+    // Create new user
+    const userId = Date.now().toString();
+    const newUser = {
+      id: userId,
+      email,
+      password, // In production, hash this
+      name: fullName,
+      role,
+      createdAt: new Date().toISOString()
+    };
 
-    // Generate simple token (in production, use proper JWT)
-    const token = Buffer.from(JSON.stringify({ userId: newUser.id, email: newUser.email })).toString('base64');
+    users.set(email, newUser);
+    console.log('✅ User created:', userId);
+
+    // Generate token
+    const token = generateToken(userId);
 
     console.log('✅ Signup successful for:', email);
 
