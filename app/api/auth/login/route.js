@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+
 import { getPrismaClient } from '../../../../lib/database-config';
 
 export async function POST(req) {

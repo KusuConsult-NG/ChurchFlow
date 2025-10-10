@@ -2,8 +2,8 @@ import { OAuth2Client } from 'google-auth-library';
 import { NextResponse } from 'next/server';
 
 import { createSuccessResponse, createErrorResponse, generateToken } from '../../../../lib/auth';
-import { GOOGLE_CONFIG } from '../../../../lib/google-config';
 import { getPrismaClient } from '../../../../lib/database-config';
+import { GOOGLE_CONFIG } from '../../../../lib/google-config';
 
 const client = new OAuth2Client(GOOGLE_CONFIG.CLIENT_ID);
 
