@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
 import { OAuth2Client } from 'google-auth-library';
+import { NextResponse } from 'next/server';
 
 import { users, generateToken } from '../../../../lib/shared-auth';
 
