@@ -98,3 +98,4 @@ console.log('   npm run dev');
 
 console.log('\n🎯 Google OAuth should now work with the Client ID from documentation!');
 console.log('   You just need to add the Client Secret from Google Cloud Console.');
+

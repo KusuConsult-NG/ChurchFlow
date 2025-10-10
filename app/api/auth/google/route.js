@@ -1,7 +1,7 @@
 import { OAuth2Client } from 'google-auth-library';
 import { NextResponse } from 'next/server';
 
-import { users, generateToken } from '../../../../lib/shared-auth';
+const { users, generateToken } = require('../../../../lib/simple-auth');
 
 // Google OAuth client
 const client = new OAuth2Client(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);

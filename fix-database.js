@@ -26,3 +26,4 @@ console.log('📝 Next steps:');
 console.log('   1. Run: npx prisma generate');
 console.log('   2. Run: npx prisma db push');
 console.log('   3. Test the application');
+

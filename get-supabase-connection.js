@@ -35,3 +35,4 @@ console.log('5. Deploy to Vercel\n');
 
 console.log('💡 TIP: If you forgot the password, you can reset it in Supabase dashboard');
 console.log('   Settings > Database > Reset database password');
+

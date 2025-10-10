@@ -52,3 +52,4 @@ GOOGLE_ANALYTICS_ID="your-google-analytics-id"
 # [ ] Cloudinary: Get Cloud Name, API Key & API Secret
 # [ ] Database: Check Neon database status or use local PostgreSQL
 # [ ] Test: Run `npm run test:services` to verify all services
+

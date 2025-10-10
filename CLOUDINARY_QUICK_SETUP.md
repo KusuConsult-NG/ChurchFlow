@@ -33,3 +33,4 @@ CLOUDINARY_API_SECRET="your-actual-api-secret-here"
 npm run test:services
 # Should show: ✅ STORAGE: SUCCESS
 ```
+

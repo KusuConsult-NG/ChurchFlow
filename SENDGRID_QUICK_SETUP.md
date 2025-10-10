@@ -35,3 +35,4 @@ SENDGRID_FROM_NAME="ChurchFlow"
 npm run test:services
 # Should show: ✅ EMAIL: SUCCESS
 ```
+

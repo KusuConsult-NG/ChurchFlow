@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { users, generateToken, validateUser } from '../../../../lib/shared-auth';
+const { users, generateToken, validateUser } = require('../../../../lib/simple-auth');
 
 export async function POST(req) {
   try {
