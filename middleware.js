@@ -49,6 +49,9 @@ function getClientId(request) {
 export function middleware(request) {
   const { pathname } = request.nextUrl;
 
+  // TEMPORARILY DISABLED - Skip all middleware to test
+  return NextResponse.next();
+
   // Skip middleware for static files and health checks
   if (
     pathname.startsWith('/_next/') ||
