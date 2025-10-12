@@ -35,3 +35,4 @@ console.log('====================');
 console.log('Your app is ready for live users!');
 console.log('The DNS issue only affects local development.');
 console.log('Vercel deployment will work perfectly!');
+

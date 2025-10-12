@@ -112,3 +112,4 @@ console.log('2. Verify your exact Vercel domain');
 console.log('3. Test the /api/auth/signin endpoint');
 console.log('4. Share the build logs if you need help');
 console.log('5. Try the minimal test page approach');
+

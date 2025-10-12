@@ -51,3 +51,4 @@ console.log('⏰ ESTIMATED FIX TIME: 10 minutes');
 console.log('==================================');
 console.log('Once database is connected, all auth issues will be resolved!');
 
+

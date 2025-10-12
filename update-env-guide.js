@@ -32,3 +32,4 @@ console.log('- No more database connection errors\n');
 
 console.log('Please provide your Supabase database password! 🔑');
 
+

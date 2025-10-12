@@ -101,3 +101,4 @@ Your ChurchFlow project now has:
 
 **Just add the Google Client Secret and your authentication will be fully functional!** 🚀
 
+

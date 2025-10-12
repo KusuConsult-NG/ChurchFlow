@@ -50,3 +50,4 @@ console.log('⚠️  Just needs Supabase setup\n');
 
 console.log('🚀 NEXT: Follow the steps above to get your app live!');
 
+

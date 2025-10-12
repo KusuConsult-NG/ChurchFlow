@@ -53,3 +53,4 @@ GOOGLE_ANALYTICS_ID="your-google-analytics-id"
 # [ ] Database: Check Neon database status or use local PostgreSQL
 # [ ] Test: Run `npm run test:services` to verify all services
 
+

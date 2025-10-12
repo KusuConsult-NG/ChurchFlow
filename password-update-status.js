@@ -34,3 +34,4 @@ console.log('===========');
 console.log('Go to: http://localhost:3000');
 console.log('Try to login or signup');
 console.log('Should work without "Internal server error"!');
+

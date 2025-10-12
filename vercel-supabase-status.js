@@ -57,3 +57,4 @@ console.log('=====================================');
 console.log('If Supabase is properly configured on Vercel,');
 console.log('your app should be fully functional right now!');
 
+

@@ -42,3 +42,4 @@ console.log('=================================');
 console.log('The authentication is working. The 401 error is expected');
 console.log('behavior when trying to login with a non-existent user.');
 console.log('This proves the database connection is working perfectly!');
+

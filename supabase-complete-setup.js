@@ -65,3 +65,4 @@ console.log('⚠️  Need to update Vercel environment variables\n');
 console.log('🚀 YOU ARE ALMOST READY TO DEPLOY!');
 console.log('Just need the database password and Vercel setup.');
 
+
